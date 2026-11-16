@@ -1,0 +1,22 @@
+#!/bin/sh
+# The desktop's browser, with the flags a Pyo sandbox needs. Every launch
+# goes through here: the panel's, an agent's and desktop.py's. It's
+# installed as browser, google-chrome and chromium, whichever browser the
+# image has (/etc/pyo/browser says which).
+#
+# Root needs --no-sandbox: the sandbox itself is the isolation. CDP
+# listens on 127.0.0.1:9223, which desktop.py serves as 9222. No
+# background downloads (component updates, models): they slow its start.
+# Flags given after these win, so a caller can pick its own port or
+# profile.
+. /etc/pyo/browser
+set -- \
+  --test-type --no-first-run --no-default-browser-check \
+  --disable-dev-shm-usage --password-store=basic \
+  --disable-background-networking --disable-component-update \
+  --hide-crash-restore-bubble \
+  --remote-debugging-address=127.0.0.1 --remote-debugging-port=9223 \
+  --user-data-dir="${HOME:-/root}/.config/browser" \
+  "$@"
+[ "$(id -u)" = 0 ] && set -- --no-sandbox "$@"
+exec "$BROWSER_PATH" "$@"

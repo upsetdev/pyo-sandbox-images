@@ -1,0 +1,48 @@
+name: Build
+
+# Both images for both architectures, each on a runner of its own
+# architecture (no QEMU), then scripts/smoke.sh against them. Nothing is
+# pushed. release.yml publishes.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  images:
+    name: Images (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, runner: ubuntu-24.04 }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The runner's own Docker builds and keeps the images, so desktop is
+      # built on the base just built.
+      - name: Build base
+        run: docker buildx build --platform linux/${{ matrix.arch }} --load -t pyo-sandbox/base:ci images/base
+      - name: Smoke test base
+        run: scripts/smoke.sh base pyo-sandbox/base:ci
+      - name: Build desktop
+        run: docker buildx build --platform linux/${{ matrix.arch }} --load --build-arg BASE=pyo-sandbox/base:ci -t pyo-sandbox/desktop:ci images/desktop
+      - name: Smoke test desktop
+        run: scripts/smoke.sh desktop pyo-sandbox/desktop:ci "desktop-${{ matrix.arch }}.png"
+      - name: Sizes
+        run: docker image ls pyo-sandbox
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: desktop-${{ matrix.arch }}
+          path: desktop-${{ matrix.arch }}.png
+          if-no-files-found: ignore

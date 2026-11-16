@@ -1,0 +1,23 @@
+# Smoke test output and screenshots
+/out/
+*.png
+
+# Release files made by CI or by hand
+images.json
+*.sigstore.json
+notes.md
+digests/
+
+# Build outputs and caches
+*.tar
+*.tar.gz
+*.oci
+.buildx-cache/
+__pycache__/
+*.pyc
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store

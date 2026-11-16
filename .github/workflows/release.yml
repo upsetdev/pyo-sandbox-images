@@ -1,0 +1,119 @@
+name: Release
+
+# Publishes both images to ghcr.io/upsetdev/pyo-sandbox-images/{base,desktop}
+# with the tags 24.04, 24.04-<YYYYMMDD> and the commit's sha, signed with
+# cosign keyless. desktop is built on the base this run just pushed,
+# pinned by digest. Then images.json (each image's digest per tag and the
+# contract version), signed the same way, goes out as the assets of a
+# GitHub release, so Pyo can read
+# releases/latest/download/images.json.
+#
+# Weekly too: the same Dockerfiles pick up Ubuntu's security updates and
+# the latest Chrome.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  packages: write
+  id-token: write
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io/upsetdev/pyo-sandbox-images
+  UBUNTU: "24.04"
+  CONTRACT: 1
+
+jobs:
+  meta:
+    name: Tags
+    runs-on: ubuntu-24.04
+    outputs:
+      date: ${{ steps.tags.outputs.date }}
+      tags: ${{ steps.tags.outputs.tags }}
+    steps:
+      - id: tags
+        run: |
+          date=$(date -u +%Y%m%d)
+          echo "date=$date" >> "$GITHUB_OUTPUT"
+          echo "tags=$UBUNTU $UBUNTU-$date $GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+  base:
+    needs: meta
+    uses: ./.github/workflows/image.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    with:
+      image: base
+      tags: ${{ needs.meta.outputs.tags }}
+
+  desktop:
+    needs: [meta, base]
+    uses: ./.github/workflows/image.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    with:
+      image: desktop
+      tags: ${{ needs.meta.outputs.tags }}
+      base: ghcr.io/upsetdev/pyo-sandbox-images/base@${{ needs.base.outputs.digest }}
+
+  images-json:
+    name: images.json
+    needs: [meta, base, desktop]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write # Signing: proves images.json came from this workflow.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Write images.json
+        env:
+          DATE: ${{ needs.meta.outputs.date }}
+          TAGS: ${{ needs.meta.outputs.tags }}
+          BASE: ${{ needs.base.outputs.digest }}
+          DESKTOP: ${{ needs.desktop.outputs.digest }}
+        run: |
+          image() {
+            jq -n --arg repo "$REGISTRY/$1" --arg digest "$2" --arg tags "$TAGS" \
+              '{repository: $repo, digest: $digest, ref: "\($repo)@\($digest)",
+                tags: ($tags | split(" ") | map({key: ., value: $digest}) | from_entries)}'
+          }
+          jq -n --argjson contract "$CONTRACT" --arg ubuntu "$UBUNTU" --arg date "$DATE" \
+            --arg commit "$GITHUB_SHA" --argjson base "$(image base "$BASE")" \
+            --argjson desktop "$(image desktop "$DESKTOP")" \
+            '{contract: $contract, ubuntu: $ubuntu, date: $date, commit: $commit,
+              images: {base: $base, desktop: $desktop}}' > images.json
+          cat images.json
+      # Keyless, like the images, with Sigstore's public instance and
+      # Rekor v1 (signing-config.json), as Pyo checks its own release.json.
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.4
+      - name: Sign images.json
+        run: cosign sign-blob --yes --signing-config .github/signing-config.json --bundle images.json.sigstore.json images.json
+      # One release per day's tag. A later run that day replaces it, as it
+      # replaces the 24.04-<YYYYMMDD> tags.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ env.UBUNTU }}-${{ needs.meta.outputs.date }}
+        run: |
+          {
+            echo "Ubuntu $UBUNTU images, contract $CONTRACT, built $(date -u +%Y-%m-%d) from $GITHUB_SHA."
+            echo
+            jq -r '.images | to_entries[] | "- `\(.value.ref)`"' images.json
+          } > notes.md
+          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "$TAG" images.json images.json.sigstore.json \
+            --target "$GITHUB_SHA" --title "$TAG" --notes-file notes.md --latest

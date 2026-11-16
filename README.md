@@ -1,0 +1,111 @@
+# Pyo Sandbox images
+
+The images [Pyo](https://github.com/upsetdev/pyo) sandboxes start from. Both are Ubuntu 24.04 LTS, built for linux/amd64 and linux/arm64, in the spirit of GitHub Actions runners.
+
+| Image | What it is |
+| --- | --- |
+| `ghcr.io/upsetdev/pyo-sandbox-images/base` | A lean dev machine with the tools coding agents expect |
+| `ghcr.io/upsetdev/pyo-sandbox-images/desktop` | `base` with a desktop you can watch in noVNC and a browser agents drive over CDP |
+
+Tags:
+
+- `24.04` is the latest build.
+- `24.04-YYYYMMDD` is the build of that day.
+- The full git sha is the build of that commit.
+
+Every image is signed with cosign keyless by this repo's release workflow. Each release also has `images.json`, which lists every image's digest per tag and the contract version, signed the same way.
+
+```sh
+cosign verify ghcr.io/upsetdev/pyo-sandbox-images/base:24.04 \
+  --certificate-identity-regexp '^https://github.com/upsetdev/pyo-sandbox-images/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+## base
+
+| Tool | Version | From |
+| --- | --- | --- |
+| Ubuntu | 24.04 LTS | `ubuntu:24.04`, pinned by digest, upgraded at each build |
+| git, curl, wget, jq, ripgrep, zip, unzip, xz, less, vim (tiny), nano, openssh-client, rsync, gnupg, procps, iproute2, ping, dig, netcat, lsof, file, sudo | Ubuntu's | Ubuntu |
+| build-essential, pkg-config, cmake, ninja | Ubuntu's | Ubuntu |
+| Python 3.12 with pip, venv and headers | Ubuntu's | Ubuntu |
+| uv, uvx | 0.13.8 | Astral's image |
+| Node.js with npm | 24.22.3 LTS | nodejs.org |
+| pnpm | 12.21.0 | corepack 0.36.0 |
+| Bun | 1.4.4 | GitHub release |
+| Deno | 2.9.8 | GitHub release |
+| GitHub CLI `gh` | 2.104.0 | GitHub's apt repository |
+| Docker CLI, buildx, compose | 29.10.0, 0.39.0, 5.7.1 | Docker's apt repository |
+| Claude Code `claude` | 2.1.325 | npm |
+| Codex `codex` | 0.169.0 | npm |
+| opencode `opencode` | 1.19.5 | npm |
+
+The Docker CLI has no daemon in the image. Point it at one with `DOCKER_HOST`.
+
+Locales: `C.UTF-8` (the default) and `en_US.UTF-8`.
+
+pip installs into the system Python, as agents expect: a sandbox is thrown away.
+
+On amd64 it's about 3.3 GB unpacked and 0.9 GB to pull. About 1.1 GB of that is the three agent CLIs, which each ship one large native binary. `desktop` adds about 1.25 GB unpacked and 0.35 GB to pull.
+
+## desktop
+
+Everything in `base`, plus:
+
+- TigerVNC (Xvnc), Openbox, a tint2 panel and xfce4-terminal
+- noVNC 1.7.0
+- Fonts: DejaVu, Liberation, Noto Color Emoji and Droid Sans Fallback for CJK
+- wmctrl and xdotool
+- One browser, which depends on the architecture
+
+| Architecture | Browser |
+| --- | --- |
+| amd64 | Google Chrome stable, from Google's apt repository |
+| arm64 | Chromium from Playwright 1.65.1, as Google has no Chrome for Linux on arm64 |
+
+Either one runs as `browser`, also named `google-chrome` and `chromium`. That wrapper adds the flags a sandbox needs: `--no-sandbox` for root, no first run, no default browser check, no background networking or component updates, and CDP on 127.0.0.1:9223. Flags you pass after them win. `/etc/pyo/browser` says which browser it is, its version and its path.
+
+Chrome's version isn't pinned, as Google's repository only keeps the latest. The weekly build picks it up.
+
+## Pyo's contract
+
+Every image carries the label `dev.pyo.sandbox.contract="1"`. Contract 1 means:
+
+- Pyo's pyo-envd runs every command as root in `/root`, with `HOME=/root`, `LANG=C.UTF-8`, `TERM=xterm-256color` and `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`. It doesn't use the image's `User`, `Env`, `WorkingDir`, `Entrypoint` or `Cmd`. So every tool works as root with that PATH, and nothing relies on the image's ENV.
+- The image has `/proc`, `/sys`, `/dev`, `/tmp`, `/run`, `/mnt` and `/root`. Pyo mounts the sandbox's writable disk on `/mnt` before it switches root.
+- When `/etc/pyo/start` is an executable file, pyo-envd runs it once at boot, in a session of its own. `base` has none.
+- `desktop`'s `/etc/pyo/start` starts only a small listener (`desktop.py`) and logs to `/var/log/pyo-desktop.log`. It listens on 127.0.0.1:
+  - 6080 serves noVNC's files and its WebSocket at `/websockify`, bridged to the screen's VNC on 5901.
+  - 9222 is the browser's CDP, passed on to the browser itself on 9223.
+- Nothing else starts until it's used. The first request on either port starts the screen, then the browser.
+- `vnc.html?app=chromium` also brings the browser to the front, maximized.
+
+A change Pyo would notice gets a new contract number.
+
+Pyo runs sandboxes as root, so the images do too. There's no `runner` user with sudo like GitHub's runners. `sudo` is installed for scripts that call it.
+
+## Build locally
+
+```sh
+docker buildx build --platform linux/amd64 --load -t pyo-sandbox/base:local images/base
+docker buildx build --platform linux/amd64 --load \
+  --build-arg BASE=pyo-sandbox/base:local -t pyo-sandbox/desktop:local images/desktop
+
+scripts/smoke.sh base pyo-sandbox/base:local
+scripts/smoke.sh desktop pyo-sandbox/desktop:local out/desktop.png
+```
+
+Use `--platform linux/arm64` for arm64. It needs an arm64 machine or QEMU.
+
+`smoke.sh` runs commands the way pyo-envd does and prints every tool's version. For `desktop` it starts `/etc/pyo/start`, then checks noVNC's page, its WebSocket (101, then the VNC greeting), CDP's `/json/version` and `?app=chromium`. With a path it saves a screenshot of the desktop through noVNC.
+
+## Versions
+
+- Every version is a build arg at the top of its Dockerfile. Updating one is a one-line change.
+- Downloads are checked against the sha256 their project publishes. apt repositories are checked against their key's fingerprint. Images are pinned by digest.
+- Pull requests build both images on both architectures and run `smoke.sh`, each architecture on a runner of its own.
+- Every push to `main` publishes. So does a weekly build, which picks up Ubuntu's security updates and the latest Chrome.
+
+## License
+
+Apache 2.0, like Pyo.
