@@ -1,0 +1,14 @@
+{
+  "BrowserSignin": 0,
+  "SyncDisabled": true,
+  "PromotionsEnabled": false,
+  "DefaultBrowserSettingEnabled": false,
+  "MetricsReportingEnabled": false,
+  "UserFeedbackAllowed": false,
+  "FeedbackSurveysEnabled": false,
+  "PasswordManagerEnabled": false,
+  "TranslateEnabled": false,
+  "BrowserLabsEnabled": false,
+  "BackgroundModeEnabled": false,
+  "GenAILocalFoundationalModelSettings": 1
+}

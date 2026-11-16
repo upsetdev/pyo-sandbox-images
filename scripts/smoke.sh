@@ -170,6 +170,14 @@ greeting = rest[2:14]
 ok(f"VNC through it: {greeting.decode().strip()}") if greeting.startswith(b"RFB ") else bad(f"no VNC greeting: {rest[:20]!r}")
 sock.close()
 
+# The browser's managed policies, where Chrome and Chromium read them.
+for d in ("/etc/opt/chrome", "/etc/chromium"):
+    try:
+        p = json.load(open(f"{d}/policies/managed/pyo.json"))
+        ok(f"{d} policies, BrowserSignin {p['BrowserSignin']}") if p.get("BrowserSignin") == 0 else bad(f"{d} policies: {p}")
+    except Exception as e:
+        bad(f"{d} policies: {e}")
+
 # CDP on 9222 starts the browser when it isn't running.
 t = time.monotonic()
 try:

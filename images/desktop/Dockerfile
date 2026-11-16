@@ -102,6 +102,13 @@ RUN set -eux; \
     cat /etc/pyo/browser; \
     browser --version
 
+# The browser's managed policies: no sign-in or sync, and no prompts that
+# get in an agent's way (default browser, saving passwords, translating,
+# promotions, surveys). No metrics, and no on-device AI model to download.
+# Chrome reads them from /etc/opt/chrome, Chromium from /etc/chromium.
+COPY policy.json /etc/opt/chrome/policies/managed/pyo.json
+COPY policy.json /etc/chromium/policies/managed/pyo.json
+
 # noVNC's web files, checked against their sha256. Ubuntu's package would
 # bring Node.js and websockify along.
 RUN set -eux; \

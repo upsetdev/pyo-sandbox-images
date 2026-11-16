@@ -67,6 +67,8 @@ Either one runs as `browser`, also named `google-chrome` and `chromium`. That wr
 
 Chrome's version isn't pinned, as Google's repository only keeps the latest. The weekly build picks it up.
 
+Managed policies (`images/desktop/policy.json`, in `/etc/opt/chrome/policies/managed` and `/etc/chromium/policies/managed`) turn off sign-in, sync and metrics, and the prompts that get in an agent's way: default browser, saving passwords, translating, promotions and surveys. `chrome://policy` lists them.
+
 ## Pyo's contract
 
 Every image carries the label `dev.pyo.sandbox.contract="1"`. Contract 1 means:
