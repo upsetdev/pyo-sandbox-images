@@ -9,7 +9,9 @@
   screen is up, and nothing waits for it.
   The page at `/` (voxl's) or `/vnc.html` (where noVNC was, which goes on
   to `./`) asked with `?app=chromium` also brings the browser to the front,
-  maximized: started when it isn't running, raised when it is.
+  maximized: started when it isn't running, raised when it is. `?name=`
+  (the sandbox's name, from Pyo's dashboard) goes on to `./`, where the
+  page puts it in its title. The page's icons, Pyo's, are served here.
 - 9222, the browser's CDP: starts the screen and the browser (CDP on 9223)
   when it isn't running, then passes the connection to it.
 
@@ -55,6 +57,15 @@ PASSWORD = secrets.token_urlsafe(32)
 COOKIE = "pyo_desktop"
 SESSION = secrets.token_urlsafe(32)
 PAGES = ("/", "/index.html", "/vnc.html", "/vnc_lite.html")
+# The page's icons: Pyo's mark as SVG, and as ICO for browsers without
+# SVG icons. Built with the image (Dockerfile).
+SHARE = "/usr/local/share/pyo-desktop"
+ICONS = {
+    "/favicon.svg": (f"{SHARE}/favicon.svg", "image/svg+xml"),
+    "/favicon.ico": (f"{SHARE}/favicon.ico", "image/x-icon"),
+}
+# The longest sandbox name passed on to the page's title.
+NAME_MAX = 64
 
 procs: dict[str, subprocess.Popen] = {}
 lock = asyncio.Lock()
@@ -217,12 +228,13 @@ def start_desktop() -> asyncio.Task:
 # ── 6080: voxl ───────────────────────────────────────────────────────────────
 
 
-def reply(w: asyncio.StreamWriter, status: str, body: bytes, extra: list[str] | None = None) -> None:
+def reply(w: asyncio.StreamWriter, status: str, body: bytes, extra: list[str] | None = None,
+          kind: str = "text/plain; charset=utf-8", cache: str = "no-store") -> None:
     head = [
         f"HTTP/1.1 {status}",
-        "Content-Type: text/plain; charset=utf-8",
+        f"Content-Type: {kind}",
         f"Content-Length: {len(body)}",
-        "Cache-Control: no-store",
+        f"Cache-Control: {cache}",
         "Connection: close",
         *(extra or []),
     ]
@@ -271,6 +283,13 @@ def local_host(host: str | None) -> bool:
         return True
     except ValueError:
         return False
+
+
+def page_name(query: dict[str, list[str]]) -> str:
+    """The sandbox's name from `?name=`, for the page's title: without
+    control characters, and at most NAME_MAX characters."""
+    name = "".join(c for c in (query.get("name") or [""])[0] if c.isprintable()).strip()
+    return name[:NAME_MAX]
 
 
 def has_cookie(headers: Headers) -> bool:
@@ -324,8 +343,20 @@ async def handle_screen(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> Non
         cookie = f"Set-Cookie: {COOKIE}={SESSION}; HttpOnly; SameSite=Lax"
         if path in ("/vnc.html", "/vnc_lite.html"):
             # Where noVNC was: voxl's page is next to it. The options were
-            # noVNC's, so they stay behind.
-            reply(w, "303 See Other", b"", ["Location: ./", cookie])
+            # noVNC's, so they stay behind. The sandbox's name goes on.
+            name = page_name(query)
+            to = "./?" + urllib.parse.urlencode({"name": name}, quote_via=urllib.parse.quote) if name else "./"
+            reply(w, "303 See Other", b"", [f"Location: {to}", cookie])
+            await w.drain()
+            return
+        if path in ICONS and method == "GET":
+            file, kind = ICONS[path]
+            try:
+                body = open(file, "rb").read()
+            except OSError:
+                reply(w, "404 Not Found", b"")
+            else:
+                reply(w, "200 OK", body, kind=kind, cache="public, max-age=86400")
             await w.drain()
             return
         await to_voxl(r, w, method, target, version, headers, cookie if page else None)

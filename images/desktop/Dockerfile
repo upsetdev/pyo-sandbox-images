@@ -14,8 +14,9 @@
 #
 # voxl streams the screen as H.264 over a WebSocket to its page, which
 # decodes it with WebCodecs. It's built from source in its own stage below,
-# against Ubuntu's x264, libyuv and Opus. The final image has its binary
-# and those libraries, no build tools.
+# against Ubuntu's x264, libyuv and Opus, with Pyo's changes to its page
+# (voxl/patches). The final image has its binary and those libraries, no
+# build tools.
 #
 # The look: Pyo's wallpaper and icons (art, icons), an Openbox theme
 # (openbox), a dock (tint2rc), GTK's dark Adwaita with Inter (gtk) and
@@ -89,6 +90,12 @@ RUN set -eux; \
     git -c advice.detachedHead=false checkout -q "$VOXL_COMMIT"
 
 WORKDIR /src/voxl
+# Pyo's changes, to its web page only. They go in the docs below, and
+# every release has the source with them.
+COPY voxl/patches /src/patches
+RUN set -eux; \
+    for p in /src/patches/*.patch; do git apply "$p"; done; \
+    git status --short
 COPY voxl-licenses.py /usr/local/bin/voxl-licenses.py
 RUN set -eux; \
     cargo build --release --locked --no-default-features ${CARGO_BUILD_JOBS:+--jobs "$CARGO_BUILD_JOBS"}; \
@@ -98,8 +105,9 @@ RUN set -eux; \
     # Its docs: license, copyright, where the source is, and the crates
     # built into it with their licenses.
     doc=/out/doc; \
-    install -d "$doc"; \
+    install -d "$doc/patches"; \
     cp LICENSE "$doc/LICENSE"; \
+    cp /src/patches/*.patch "$doc/patches/"; \
     cp web/inter-LICENSE.txt "$doc/inter-LICENSE.txt"; \
     python3 -I /usr/local/bin/voxl-licenses.py "$doc/crates" --no-default-features; \
     deb() { dpkg-query -W -f '${source:Package} ${source:Version}' "$1"; }; \
@@ -111,10 +119,16 @@ RUN set -eux; \
       echo "Commit: $VOXL_COMMIT"; \
       echo "Tarball: https://github.com/tembo/voxl/archive/$VOXL_COMMIT.tar.gz"; \
       echo; \
-      echo "Every release of https://github.com/upsetdev/pyo-sandbox-images has this"; \
-      echo "source as voxl-$VOXL_VERSION-${VOXL_COMMIT:0:12}.tar.gz (git archive of the commit),"; \
-      echo "and the Rust crates built into it as voxl-$VOXL_VERSION-${VOXL_COMMIT:0:12}-vendor.tar.gz"; \
-      echo "(cargo vendor). Unpacked in one folder, the two build offline."; \
+      echo "Changed for Pyo: its web page only (the icons, the loading screen and"; \
+      echo "the tab's title). The changes are the patches in patches/ here, applied"; \
+      echo "in order with git apply to that commit. They're also in"; \
+      echo "images/desktop/voxl/patches in https://github.com/upsetdev/pyo-sandbox-images."; \
+      echo; \
+      echo "Every release of that repository has the source with the patches applied"; \
+      echo "as voxl-$VOXL_VERSION-${VOXL_COMMIT:0:12}-patched.tar.gz, with the patches in its"; \
+      echo "pyo-patches folder, and the Rust crates built into it as"; \
+      echo "voxl-$VOXL_VERSION-${VOXL_COMMIT:0:12}-vendor.tar.gz (cargo vendor). Unpacked in one"; \
+      echo "folder, the two build offline."; \
       echo; \
       echo "Built with Rust $RUST_VERSION and esbuild $ESBUILD_VERSION:"; \
       echo "  cargo build --release --locked --no-default-features"; \
@@ -130,6 +144,7 @@ RUN set -eux; \
       echo "voxl $VOXL_VERSION, https://github.com/tembo/voxl"; \
       echo; \
       echo "voxl's own code: MIT License, Copyright (c) 2026 Tembo. See LICENSE."; \
+      echo "Pyo's changes to it (patches/) are under the same license."; \
       echo; \
       echo "This binary links x264, which is GPL-2.0-or-later, so the binary is"; \
       echo "distributed under the GNU General Public License, version 2 or later."; \
@@ -148,7 +163,7 @@ RUN set -eux; \
     } > "$doc/copyright"
 
 # ── The desktop's art ───────────────────────────────────────────────────────
-# The wallpaper, rendered from its SVG in art.
+# The wallpaper and the page's icons, rendered from the SVGs in art.
 FROM ${BASE} AS art
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
@@ -280,7 +295,7 @@ COPY gtk/gtk.css /root/.config/gtk-3.0/gtk.css
 COPY xfce4-terminal.xml /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml
 COPY tint2rc /etc/xdg/tint2/tint2rc
 COPY dock /usr/local/share/pyo-desktop/dock
-# The wallpaper.
+# The wallpaper and the page's icons, which desktop.py serves.
 COPY --from=art /out /usr/local/share/pyo-desktop
 
 COPY start /etc/pyo/start

@@ -7,8 +7,9 @@
 # Commands run as pyo-envd runs them: as root in /root, with only HOME,
 # LANG, TERM and PATH set, not the image's own Env.
 # `desktop` starts /etc/pyo/start in a container, then checks voxl's page
-# (and where noVNC's was), its WebSocket, its screenshot, CDP, the browser
-# and the dock on 127.0.0.1 inside it, and the third-party notices. With a path
+# (and where noVNC's was, with the sandbox's name), Pyo's changes to it
+# and its icons, its WebSocket, its screenshot, CDP, the browser and the
+# dock on 127.0.0.1 inside it, and the third-party notices. With a path
 # it also saves a screenshot of voxl's page as a viewer sees it, taken by
 # a second, headless browser in the image.
 set -euo pipefail
@@ -154,12 +155,33 @@ if s == 303 and h.get("location") == "./" and cookie.startswith("pyo_desktop="):
     ok("vnc.html goes on to ./ with its cookie")
 else:
     bad(f"vnc.html: {s} {h}")
+# The sandbox's name goes on to the page, for its title.
+s, h, _ = request("/vnc.html?autoconnect=1&name=my%20box%0A&app=x")
+if s == 303 and h.get("location") == "./?name=my%20box":
+    ok("vnc.html?name= goes on to ./?name=")
+else:
+    bad(f"vnc.html?name=: {s} {h.get('location')}")
 s, h, body = request("/")
 ok(f"voxl's page {s}, {len(body)} bytes") if s == 200 and b"client.js" in body else bad(f"voxl's page: {s} {body[:200]!r}")
 ok("its cookie with it") if h.get("set-cookie", "").startswith("pyo_desktop=") else bad(f"no cookie with the page: {h}")
+# Pyo's changes to the page (images/desktop/voxl/patches): its icons, its
+# loading screen and voxl's notice.
+if b'href="favicon.svg"' in body and b'id="status-text"' in body and b"Copyright (c) 2026 Tembo" in body:
+    ok("the page has Pyo's icons, loading screen and voxl's notice")
+else:
+    bad("the page lacks Pyo's changes")
 for f in ("client.js", "worker.js"):
     s, _, body = request("/" + f)
     ok(f"{f} {s}, {len(body)} bytes") if s == 200 and len(body) > 1000 else bad(f"{f} {s}")
+    ok(f"{f} has voxl's notice") if b"Copyright (c) 2026 Tembo" in body else bad(f"{f} has no notice")
+_, _, body = request("/client.js")
+ok("the title takes the name") if b" | " in body and b"name" in body else bad("client.js doesn't set the title")
+for f, kind, magic in (("favicon.svg", "image/svg+xml", b"<svg"), ("favicon.ico", "image/x-icon", b"\0\0\1\0")):
+    s, h, body = request("/" + f)
+    if s == 200 and h.get("content-type") == kind and body.startswith(magic):
+        ok(f"{f} {s}, {len(body)} bytes")
+    else:
+        bad(f"{f}: {s} {h.get('content-type')}")
 
 # voxl's WebSocket: 101, then its hello (JSON), as from voxl's page through Pyo
 # (another origin, with the cookie). Without the cookie, a page of another
@@ -291,7 +313,7 @@ ok("the browser is maximized") if "1280x" in s else bad(f"the browser isn't maxi
 # Third-party notices.
 for f in ("/usr/share/doc/pyo-sandbox-images/THIRD_PARTY_NOTICES.md", "/usr/share/doc/voxl/LICENSE",
           "/usr/share/doc/voxl/copyright", "/usr/share/doc/voxl/SOURCE", "/usr/share/doc/voxl/crates/README.md",
-          "/usr/share/doc/libx264-164/copyright"):
+          "/usr/share/doc/voxl/patches/0001-pyo-web-page.patch", "/usr/share/doc/libx264-164/copyright"):
     ok(f"{f}") if os.path.getsize(f) > 0 else bad(f"{f} is empty")
 
 log = open("/var/log/pyo-desktop.log").read()
