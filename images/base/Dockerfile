@@ -38,6 +38,7 @@ LABEL org.opencontainers.image.source=https://github.com/upsetdev/pyo-sandbox-im
       org.opencontainers.image.title="Pyo Sandbox base" \
       org.opencontainers.image.description="Ubuntu 24.04 with git, Python, uv, Node.js, Bun, Deno, Docker CLI and coding agent CLIs" \
       org.opencontainers.image.licenses=Apache-2.0 \
+      dev.pyo.sandbox.notices=/usr/share/doc/pyo-sandbox-images/THIRD_PARTY_NOTICES.md \
       dev.pyo.sandbox.contract="1"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -99,9 +100,12 @@ RUN set -eux; \
     curl -fsSLO "https://nodejs.org/dist/v$NODE_VERSION/$f"; \
     curl -fsSL "https://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt" | grep " $f\$" | sha256sum -c -; \
     tar -xJf "$f" -C /usr/local --strip-components=1 --no-same-owner \
-      --exclude='*/CHANGELOG.md' --exclude='*/README.md' --exclude='*/LICENSE' --exclude='*/doc' \
+      --exclude='*/CHANGELOG.md' --exclude='*/README.md' --exclude='*/doc' \
       --exclude='*/include/node/openssl/archs'; \
     rm "$f"; \
+    # Its license, with those of what it bundles, where docs go.
+    install -d /usr/share/doc/nodejs; \
+    mv /usr/local/LICENSE /usr/share/doc/nodejs/LICENSE; \
     npm install -g "corepack@$COREPACK_VERSION"; \
     corepack enable pnpm; \
     COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack install -g "pnpm@$PNPM_VERSION"; \
@@ -149,6 +153,10 @@ RUN set -eux; \
     claude --version; codex --version; opencode --version
 
 RUN uv --version && python3 --version && git --version
+
+# Third-party software in the image and its licenses. The build needs the
+# repo's root as the named context `notices`: --build-context notices=.
+COPY --from=notices THIRD_PARTY_NOTICES.md /usr/share/doc/pyo-sandbox-images/THIRD_PARTY_NOTICES.md
 
 WORKDIR /root
 CMD ["bash"]

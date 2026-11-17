@@ -31,11 +31,11 @@ jobs:
       # The runner's own Docker builds and keeps the images, so desktop is
       # built on the base just built.
       - name: Build base
-        run: docker buildx build --platform linux/${{ matrix.arch }} --load -t pyo-sandbox/base:ci images/base
+        run: docker buildx build --platform linux/${{ matrix.arch }} --load --build-context notices=. -t pyo-sandbox/base:ci images/base
       - name: Smoke test base
         run: scripts/smoke.sh base pyo-sandbox/base:ci
       - name: Build desktop
-        run: docker buildx build --platform linux/${{ matrix.arch }} --load --build-arg BASE=pyo-sandbox/base:ci -t pyo-sandbox/desktop:ci images/desktop
+        run: docker buildx build --platform linux/${{ matrix.arch }} --load --build-context notices=. --build-arg BASE=pyo-sandbox/base:ci -t pyo-sandbox/desktop:ci images/desktop
       - name: Smoke test desktop
         run: scripts/smoke.sh desktop pyo-sandbox/desktop:ci "desktop-${{ matrix.arch }}.png"
       - name: Sizes

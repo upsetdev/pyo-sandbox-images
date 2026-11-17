@@ -97,17 +97,18 @@ Pyo runs sandboxes as root, so the images do too. There's no `runner` user with 
 ## Build locally
 
 ```sh
-docker buildx build --platform linux/amd64 --load -t pyo-sandbox/base:local images/base
-docker buildx build --platform linux/amd64 --load \
+docker buildx build --platform linux/amd64 --load --build-context notices=. \
+  -t pyo-sandbox/base:local images/base
+docker buildx build --platform linux/amd64 --load --build-context notices=. \
   --build-arg BASE=pyo-sandbox/base:local -t pyo-sandbox/desktop:local images/desktop
 
 scripts/smoke.sh base pyo-sandbox/base:local
 scripts/smoke.sh desktop pyo-sandbox/desktop:local out/desktop.png
 ```
 
-Use `--platform linux/arm64` for arm64. It needs an arm64 machine or QEMU. `desktop` builds voxl with Rust: `--build-arg CARGO_BUILD_JOBS=4` uses less memory.
+`--build-context notices=.` gives the build THIRD_PARTY_NOTICES.md, which both images carry. Use `--platform linux/arm64` for arm64. It needs an arm64 machine or QEMU. `desktop` builds voxl with Rust: `--build-arg CARGO_BUILD_JOBS=4` uses less memory.
 
-`smoke.sh` runs commands the way pyo-envd does and prints every tool's version. For `desktop` it starts `/etc/pyo/start`, then checks `vnc.html` and voxl's page, its WebSocket (101, then voxl's hello) and who it lets in, voxl's screenshot (not black) and `/wait`, CDP's `/json/version`, `?app=chromium` and voxl's license. With a path it saves a screenshot of voxl's page as a viewer sees it.
+`smoke.sh` runs commands the way pyo-envd does and prints every tool's version. For `desktop` it starts `/etc/pyo/start`, then checks `vnc.html` and voxl's page, its WebSocket (101, then voxl's hello) and who it lets in, voxl's screenshot (not black) and `/wait`, CDP's `/json/version`, `?app=chromium` and the notices. With a path it saves a screenshot of voxl's page as a viewer sees it.
 
 ## Versions
 
@@ -116,6 +117,6 @@ Use `--platform linux/arm64` for arm64. It needs an arm64 machine or QEMU. `desk
 - Pull requests build both images on both architectures and run `smoke.sh`, each architecture on a runner of its own.
 - Every push to `main` publishes. So does a weekly build, which picks up Ubuntu's security updates and the latest Chrome.
 
-## License
+## Licenses
 
-Apache 2.0, like Pyo.
+This repo's own files are Apache 2.0, like Pyo. The images bundle software under other licenses, including the GPL (voxl's binary, as it links x264, which is GPL). [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists each one with its version, license and source. Both images carry it in `/usr/share/doc/pyo-sandbox-images`, and the label `dev.pyo.sandbox.notices` points to it. voxl's license, copyright and source are in `/usr/share/doc/voxl`, and every release here has voxl's source as a tarball.

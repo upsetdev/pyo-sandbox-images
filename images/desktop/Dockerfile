@@ -24,6 +24,10 @@
 #
 # Everything runs as root, like the rest of the sandbox, so the browser
 # runs with --no-sandbox: the sandbox itself is the isolation.
+#
+# Third-party software and its licenses: THIRD_PARTY_NOTICES.md, also in
+# /usr/share/doc/pyo-sandbox-images in the image. The build needs it as the
+# named context `notices` (the repo's root): --build-context notices=.
 
 ARG BASE=ghcr.io/upsetdev/pyo-sandbox-images/base:24.04
 ARG PLAYWRIGHT_VERSION=1.65.1
@@ -145,6 +149,7 @@ LABEL org.opencontainers.image.source=https://github.com/upsetdev/pyo-sandbox-im
       org.opencontainers.image.title="Pyo Sandbox desktop" \
       org.opencontainers.image.description="Pyo Sandbox base with a desktop in voxl and a browser with CDP" \
       org.opencontainers.image.licenses=Apache-2.0 \
+      dev.pyo.sandbox.notices=/usr/share/doc/pyo-sandbox-images/THIRD_PARTY_NOTICES.md \
       dev.pyo.sandbox.contract="1"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -231,6 +236,9 @@ COPY --from=voxl /out/doc /usr/share/doc/voxl
 RUN set -eux; \
     if ldd /usr/local/bin/voxl | grep 'not found'; then exit 1; fi; \
     voxl --version
+
+# Third-party software in the image and its licenses.
+COPY --from=notices THIRD_PARTY_NOTICES.md /usr/share/doc/pyo-sandbox-images/THIRD_PARTY_NOTICES.md
 
 COPY start /etc/pyo/start
 COPY desktop.py /usr/local/lib/pyo-desktop/desktop.py

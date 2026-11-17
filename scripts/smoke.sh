@@ -8,7 +8,7 @@
 # LANG, TERM and PATH set, not the image's own Env.
 # `desktop` starts /etc/pyo/start in a container, then checks voxl's page
 # (and where noVNC's was), its WebSocket, its screenshot, CDP and the
-# browser on 127.0.0.1 inside it, and voxl's license. With a path
+# browser on 127.0.0.1 inside it, and the third-party notices. With a path
 # it also saves a screenshot of voxl's page as a viewer sees it, taken by
 # a second, headless browser in the image.
 set -euo pipefail
@@ -280,8 +280,8 @@ while time.monotonic() - t < 20:
     time.sleep(0.5)
 ok("?app=chromium: the browser has a window") if "chrom" in out.lower() else bad(f"?app=chromium: no browser window: {out!r}")
 
-# voxl's license, copyright and source, and its libraries'.
-for f in ("/usr/share/doc/voxl/LICENSE",
+# Third-party notices.
+for f in ("/usr/share/doc/pyo-sandbox-images/THIRD_PARTY_NOTICES.md", "/usr/share/doc/voxl/LICENSE",
           "/usr/share/doc/voxl/copyright", "/usr/share/doc/voxl/SOURCE", "/usr/share/doc/voxl/crates/README.md",
           "/usr/share/doc/libx264-164/copyright"):
     ok(f"{f}") if os.path.getsize(f) > 0 else bad(f"{f} is empty")

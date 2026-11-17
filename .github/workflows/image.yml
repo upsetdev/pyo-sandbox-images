@@ -54,6 +54,7 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: images/${{ inputs.image }}
+          build-contexts: notices=.
           platforms: linux/${{ matrix.arch }}
           build-args: ${{ inputs.base && format('BASE={0}', inputs.base) || '' }}
           load: true
@@ -67,6 +68,7 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: images/${{ inputs.image }}
+          build-contexts: notices=.
           platforms: linux/${{ matrix.arch }}
           build-args: ${{ inputs.base && format('BASE={0}', inputs.base) || '' }}
           labels: org.opencontainers.image.revision=${{ github.sha }}
