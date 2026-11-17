@@ -72,7 +72,7 @@ The desktop looks like Pyo:
 - A dock centered at the bottom, `pyo-dock` (`images/desktop/dock/pyo-dock.c`, a small GTK program built with the image). Terminal, the browser and Files are pinned. Each app's icon is also its windows': a dot under it says it runs, and a click starts it or brings it to the front. Other apps get an icon while they run, and a clock ends the dock. voxl rounds its corners and the windows', so there's no compositor.
 - Pyo's wallpaper and icons, drawn as SVG in `images/desktop/art` and `images/desktop/icons`. The build renders the wallpaper and the page's ICO.
 - The dashboard's colors, radius and font (Inter) everywhere: an Openbox theme of its own (`images/desktop/openbox`), GTK's dark Adwaita with a stylesheet on top (`images/desktop/gtk`), the file manager with places, icons and a plain toolbar (`images/desktop/files`), and a terminal in JetBrains Mono. The browser keeps its light theme, so web pages look as they do anywhere.
-- voxl's page has Pyo's icon, and its title names the sandbox: `Desktop | <name>`, from `?name=`.
+- voxl's page has Pyo's icon and a loading screen with Pyo's mark, gone on the desktop's first frame. Its title names the sandbox: `Desktop | <name>`, from `?name=`.
 
 Managed policies (`images/desktop/policy.json`, in `/etc/opt/chrome/policies/managed` and `/etc/chromium/policies/managed`) turn off sign-in, sync and metrics, and the prompts that get in an agent's way: default browser, saving passwords, translating, promotions and surveys. `chrome://policy` lists them.
 
