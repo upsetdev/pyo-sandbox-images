@@ -5,7 +5,7 @@ The images [Pyo](https://github.com/upsetdev/pyo) sandboxes start from. Both are
 | Image | What it is |
 | --- | --- |
 | `ghcr.io/upsetdev/pyo-sandbox-images/base` | A lean dev machine with the tools coding agents expect |
-| `ghcr.io/upsetdev/pyo-sandbox-images/desktop` | `base` with a desktop you can watch in noVNC and a browser agents drive over CDP |
+| `ghcr.io/upsetdev/pyo-sandbox-images/desktop` | `base` with a desktop you can watch and use in voxl and a browser agents drive over CDP |
 
 Tags:
 
@@ -52,8 +52,8 @@ On amd64 it's about 3.3 GB unpacked and 0.9 GB to pull. About 1.1 GB of that is 
 
 Everything in `base`, plus:
 
-- TigerVNC (Xvnc), Openbox, a tint2 panel and xfce4-terminal
-- noVNC 1.7.0
+- Xvfb, Openbox, a tint2 panel and xfce4-terminal
+- [voxl](https://github.com/tembo/voxl) 0.3.5, built from source against Ubuntu's x264, libyuv and Opus. It streams the screen as H.264 to its web page, which decodes it with WebCodecs, so the page has to be on HTTPS or localhost
 - Fonts: DejaVu, Liberation, Noto Color Emoji and Droid Sans Fallback for CJK
 - wmctrl and xdotool
 - One browser, which depends on the architecture
@@ -77,10 +77,18 @@ Every image carries the label `dev.pyo.sandbox.contract="1"`. Contract 1 means:
 - The image has `/proc`, `/sys`, `/dev`, `/tmp`, `/run`, `/mnt` and `/root`. Pyo mounts the sandbox's writable disk on `/mnt` before it switches root.
 - When `/etc/pyo/start` is an executable file, pyo-envd runs it once at boot, in a session of its own. `base` has none.
 - `desktop`'s `/etc/pyo/start` starts only a small listener (`desktop.py`) and logs to `/var/log/pyo-desktop.log`. It listens on 127.0.0.1:
-  - 6080 serves noVNC's files and its WebSocket at `/websockify`, bridged to the screen's VNC on 5901.
+  - 6080 is voxl: its page at `/`, its WebSocket at `/ws` and its API (`/screenshot`, `/wait`, `/record`, `/files`). desktop.py passes each request on to voxl on 127.0.0.1:6901, which has a password only desktop.py knows.
   - 9222 is the browser's CDP, passed on to the browser itself on 9223.
-- Nothing else starts until it's used. The first request on either port starts the screen, then the browser.
-- `vnc.html?app=chromium` also brings the browser to the front, maximized.
+- Nothing else starts until it's used. The first request on either port starts the screen, then voxl and the browser.
+- `vnc.html`, where noVNC's page was, goes on to `./`, voxl's page. `?app=chromium` on either one also brings the browser to the front, maximized.
+- 6080 lets in what Pyo's sandbox server passes on (as `localhost:6080`) and programs in the sandbox, which send no `Origin`. A page of another site in the sandbox's browser is turned away, unless it has the cookie voxl's page gets from 6080. So is a `Host` that isn't localhost or an IP address.
+
+Programs in the sandbox can use voxl's API through 6080 with no password:
+
+```sh
+curl -o shot.png localhost:6080/screenshot   # the screen as a PNG
+curl localhost:6080/wait                     # once the screen settles
+```
 
 A change Pyo would notice gets a new contract number.
 
@@ -97,9 +105,9 @@ scripts/smoke.sh base pyo-sandbox/base:local
 scripts/smoke.sh desktop pyo-sandbox/desktop:local out/desktop.png
 ```
 
-Use `--platform linux/arm64` for arm64. It needs an arm64 machine or QEMU.
+Use `--platform linux/arm64` for arm64. It needs an arm64 machine or QEMU. `desktop` builds voxl with Rust: `--build-arg CARGO_BUILD_JOBS=4` uses less memory.
 
-`smoke.sh` runs commands the way pyo-envd does and prints every tool's version. For `desktop` it starts `/etc/pyo/start`, then checks noVNC's page, its WebSocket (101, then the VNC greeting), CDP's `/json/version` and `?app=chromium`. With a path it saves a screenshot of the desktop through noVNC.
+`smoke.sh` runs commands the way pyo-envd does and prints every tool's version. For `desktop` it starts `/etc/pyo/start`, then checks `vnc.html` and voxl's page, its WebSocket (101, then voxl's hello) and who it lets in, voxl's screenshot (not black) and `/wait`, CDP's `/json/version`, `?app=chromium` and voxl's license. With a path it saves a screenshot of voxl's page as a viewer sees it.
 
 ## Versions
 

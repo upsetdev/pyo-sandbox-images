@@ -2,47 +2,59 @@
 """The desktop image's desktop, started on first use.
 
 /etc/pyo/start runs this when the sandbox boots. It listens on 127.0.0.1:
-- 6080, the screen in noVNC. It serves noVNC's files itself, at once and
-  with no other program, and its WebSocket at /websockify, which it
-  bridges to the screen's VNC (5901). The first request starts the screen
-  (Xvnc) and the session in the background, so they're up by the time
-  noVNC connects. A WebSocket waits only for the screen. The browser
-  starts once the screen is up, and nothing waits for it.
-  The page asked as `vnc.html?app=chromium` also brings the browser to the
-  front, maximized: started when it isn't running, raised when it is.
+- 6080, the screen in voxl. Every request goes on to voxl, which listens
+  on 127.0.0.1:6901 with a password only this program knows. The first
+  request starts the screen (Xvfb), the session and voxl in the
+  background. A request waits only for voxl. The browser starts once the
+  screen is up, and nothing waits for it.
+  The page at `/` (voxl's) or `/vnc.html` (where noVNC was, which goes on
+  to `./`) asked with `?app=chromium` also brings the browser to the front,
+  maximized: started when it isn't running, raised when it is.
 - 9222, the browser's CDP: starts the screen and the browser (CDP on 9223)
   when it isn't running, then passes the connection to it.
+
+Who may use 6080: Pyo's sandbox server passes it on only to whoever has
+the sandbox's token, as `localhost:6080`. Programs in the sandbox (curl,
+an agent asking for /screenshot or /wait) send no Origin and are let in
+too. A web page open in the sandbox's own browser isn't: what it sends
+carries the Origin of another site, and is let in only with the cookie
+voxl's page gets here. A Host that isn't localhost or an IP address (a
+domain made to point at 127.0.0.1) is turned away.
 
 The browser is /usr/local/bin/browser: Google Chrome on amd64, Playwright's
 Chromium on arm64 (see /etc/pyo/browser).
 
-So a sandbox nobody looks at runs no X server and no browser. What it
-starts stays up, and is started again if it exited. It logs to
+So a sandbox nobody looks at runs no X server, no voxl and no browser.
+What it starts stays up, and is started again if it exited. It logs to
 /var/log/pyo-desktop.log, with how long each start took.
 """
 
 import asyncio
-import base64
-import hashlib
-import mimetypes
+import ipaddress
 import os
-import struct
+import secrets
 import subprocess
 import time
 import urllib.parse
 
 HOST = "127.0.0.1"
 DISPLAY = ":1"
-VNC = 5901
+X_SOCKET = "/tmp/.X11-unix/X1"
 SCREEN = 6080
+VOXL = 6901
 CDP, BROWSER_CDP = 9222, 9223
 BROWSER = "/usr/local/bin/browser"
 # What wmctrl -x finds the browser's windows by, in their WM_CLASS:
 # google-chrome for Chrome, chromium for Chromium.
 WM_CLASS = "chrom"
 SIZE = "1280x800"
-NOVNC = "/usr/share/novnc"
-WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+# voxl's password, new at every boot. This program adds it to what it
+# passes on, so nothing reaches voxl without coming through here.
+PASSWORD = secrets.token_urlsafe(32)
+# The cookie voxl's page gets from here, which lets its requests in.
+COOKIE = "pyo_desktop"
+SESSION = secrets.token_urlsafe(32)
+PAGES = ("/", "/index.html", "/vnc.html", "/vnc_lite.html")
 
 procs: dict[str, subprocess.Popen] = {}
 lock = asyncio.Lock()
@@ -70,18 +82,25 @@ def alive(name: str) -> bool:
     return p is not None and p.poll() is None
 
 
-def spawn(name: str, args: list[str]) -> None:
+def spawn(name: str, args: list[str], extra: dict | None = None, logs: bool = False) -> None:
     log(f"starting {name}")
     os.makedirs("/tmp/runtime-root", mode=0o700, exist_ok=True)
     procs[name] = subprocess.Popen(
         args,
-        env=env(),
+        env={**env(), **(extra or {})},
         cwd=env()["HOME"],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        # Its warnings go to this program's log.
+        stderr=None if logs else subprocess.DEVNULL,
         start_new_session=True,
     )
+
+
+def stop(name: str) -> None:
+    p = procs.pop(name, None)
+    if p is not None and p.poll() is None:
+        p.terminate()
 
 
 async def answers(port: int) -> bool:
@@ -93,9 +112,18 @@ async def answers(port: int) -> bool:
     return True
 
 
-async def wait_for(port: int, secs: float, name: str) -> None:
+async def x_answers() -> bool:
+    try:
+        _, w = await asyncio.open_unix_connection(X_SOCKET)
+    except OSError:
+        return False
+    w.close()
+    return True
+
+
+async def wait_for(check, secs: float, name: str) -> None:
     t = time.monotonic()
-    while not await answers(port):
+    while not await check():
         if time.monotonic() - t > secs:
             raise RuntimeError(f"{name} didn't start in {int(secs)}s")
         await asyncio.sleep(0.05)
@@ -103,31 +131,37 @@ async def wait_for(port: int, secs: float, name: str) -> None:
 
 
 async def screen() -> None:
-    """The screen and its session, once."""
+    """The screen, its session and voxl, once."""
     async with lock:
         if not alive("screen"):
-            spawn("screen", [
-                "Xvnc", DISPLAY, "-rfbport", str(VNC), "-localhost", "-SecurityTypes", "None",
-                "-geometry", SIZE, "-depth", "24", "-AlwaysShared", "-AcceptSetDesktopSize",
-            ])
-            await wait_for(VNC, 20, "the screen")
-            # A new screen needs a new session.
+            # A new screen needs a new session and a new voxl.
+            stop("voxl")
             procs.pop("session", None)
+            # -shmem: voxl reads the screen straight from Xvfb's memory.
+            spawn("screen", ["Xvfb", DISPLAY, "-screen", "0", f"{SIZE}x24", "-shmem", "-nolisten", "tcp", "-noreset"])
+            await wait_for(x_answers, 20, "the screen")
         if not alive("session"):
             spawn("session", ["dbus-launch", "--exit-with-session", "/usr/local/lib/pyo-desktop/session"])
+        if not alive("voxl"):
+            spawn("voxl", [
+                "voxl", "--addr", HOST, "--port", str(VOXL), "--title", "Desktop",
+                # The sandbox has no sound, so no audio or microphone.
+                "--audio-enabled=false", "--microphone-enabled=false",
+            ], {"VOXL_PASSWORD": PASSWORD, "RUST_LOG": "warn"}, logs=True)
+            await wait_for(lambda: answers(VOXL), 20, "voxl")
 
 
 async def browser() -> None:
     """The browser on the screen, with CDP up."""
     global browser_started
     await screen()
-    # Its own lock: the screen's WebSocket never waits on the browser.
+    # Its own lock: the screen never waits on the browser.
     async with browser_lock:
         browser_started = True
         if not await answers(BROWSER_CDP):
             if not alive("browser"):
                 spawn("browser", [BROWSER, "--start-maximized", "about:blank"])
-            await wait_for(BROWSER_CDP, 60, "the browser")
+            await wait_for(lambda: answers(BROWSER_CDP), 60, "the browser")
 
 
 async def desktop() -> None:
@@ -177,56 +211,89 @@ def start_desktop() -> asyncio.Task:
     return starting
 
 
-# ── 6080: noVNC's files and its WebSocket ───────────────────────────────────
-
-files: dict[str, tuple[bytes, str]] = {}
+# ── 6080: voxl ───────────────────────────────────────────────────────────────
 
 
-def static(path: str) -> tuple[bytes, str] | None:
-    """A file of noVNC's, kept in memory once read."""
-    if path in ("", "/"):
-        path = "/vnc.html"
-    if path in files:
-        return files[path]
-    full = os.path.realpath(os.path.join(NOVNC, path.lstrip("/")))
-    if not full.startswith(NOVNC + "/") or not os.path.isfile(full):
-        return None
-    with open(full, "rb") as f:
-        body = f.read()
-    kind = mimetypes.guess_type(full)[0] or "application/octet-stream"
-    if kind.startswith("text/") or kind == "application/javascript":
-        kind += "; charset=utf-8"
-    files[path] = (body, kind)
-    return files[path]
-
-
-def reply(w: asyncio.StreamWriter, status: str, body: bytes, kind: str = "text/plain; charset=utf-8", cache: bool = False) -> None:
+def reply(w: asyncio.StreamWriter, status: str, body: bytes, extra: list[str] | None = None) -> None:
     head = [
         f"HTTP/1.1 {status}",
-        f"Content-Type: {kind}",
+        "Content-Type: text/plain; charset=utf-8",
         f"Content-Length: {len(body)}",
-        # Its files only change with the image.
-        "Cache-Control: " + ("private, max-age=86400" if cache else "no-store"),
+        "Cache-Control: no-store",
         "Connection: close",
+        *(extra or []),
     ]
     w.write(("\r\n".join(head) + "\r\n\r\n").encode() + body)
 
 
-async def read_head(r: asyncio.StreamReader) -> tuple[str, str, dict[str, str]] | None:
+Headers = list[tuple[str, str]]
+
+
+async def read_head(r: asyncio.StreamReader) -> tuple[str, str, str, Headers] | None:
     try:
         raw = await asyncio.wait_for(r.readuntil(b"\r\n\r\n"), 30)
     except (asyncio.IncompleteReadError, asyncio.LimitOverrunError, asyncio.TimeoutError, OSError):
         return None
     lines = raw.decode("latin-1").split("\r\n")
     parts = lines[0].split(" ")
-    if len(parts) < 3:
+    if len(parts) != 3:
         return None
-    headers = {}
+    headers = []
     for line in lines[1:]:
         if ":" in line:
             k, v = line.split(":", 1)
-            headers[k.strip().lower()] = v.strip()
-    return parts[0], parts[1], headers
+            headers.append((k.strip(), v.strip()))
+    return parts[0], parts[1], parts[2], headers
+
+
+def header(headers: Headers, name: str) -> str | None:
+    return next((v for k, v in headers if k.lower() == name), None)
+
+
+def local_host(host: str | None) -> bool:
+    """A Host that can't be a domain pointed at 127.0.0.1: localhost or an
+    IP address. Programs that send none are let in."""
+    if host is None:
+        return True
+    host = host.strip().lower()
+    if host.startswith("["):
+        name = host[1:].split("]", 1)[0]
+    else:
+        name = host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+    name = name.rstrip(".")
+    if name == "localhost" or name.endswith(".localhost"):
+        return True
+    try:
+        ipaddress.ip_address(name)
+        return True
+    except ValueError:
+        return False
+
+
+def has_cookie(headers: Headers) -> bool:
+    for k, v in headers:
+        if k.lower() != "cookie":
+            continue
+        for part in v.split(";"):
+            name, _, value = part.strip().partition("=")
+            if name == COOKIE and secrets.compare_digest(value.encode(), SESSION.encode()):
+                return True
+    return False
+
+
+def turned_away(headers: Headers) -> str | None:
+    """Why a request is turned away, or None to let it in."""
+    host = header(headers, "host")
+    if not local_host(host):
+        return "The desktop answers only on localhost."
+    origin = header(headers, "origin")
+    if origin is None or has_cookie(headers):
+        return None
+    # A page this listener served itself, opened at the address it asks.
+    u = urllib.parse.urlsplit(origin)
+    if host and u.scheme in ("http", "https") and u.netloc.lower() == host.strip().lower():
+        return None
+    return "Open the desktop from Pyo."
 
 
 async def handle_screen(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
@@ -234,105 +301,86 @@ async def handle_screen(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> Non
         head = await read_head(r)
         if head is None:
             return
-        method, target, headers = head
-        path = urllib.parse.unquote(urllib.parse.urlsplit(target).path)
+        method, target, version, headers = head
+        split = urllib.parse.urlsplit(target)
+        path = urllib.parse.unquote(split.path)
+        query = urllib.parse.parse_qs(split.query)
         # Whatever is asked first, the screen starts now.
-        task = start_desktop()
-        query = urllib.parse.parse_qs(urllib.parse.urlsplit(target).query)
-        page = path in ("", "/", "/vnc.html")
+        start_desktop()
+        why = turned_away(headers)
+        if why is not None:
+            log(f"turned away {method} {path}: {why}")
+            reply(w, "403 Forbidden", why.encode() + b"\n")
+            await w.drain()
+            return
+        page = path in PAGES
         if page and "app" in query:
             asyncio.ensure_future(front(query["app"][0])).add_done_callback(
                 lambda t: t.cancelled() or not t.exception() or log(f"couldn't bring it to the front: {t.exception()}")
             )
-        if path.rstrip("/").endswith("/websockify") or path == "/websockify":
-            if headers.get("upgrade", "").lower() != "websocket":
-                reply(w, "400 Bad Request", b"This is noVNC's WebSocket.\n")
-                return
-            await websocket(r, w, headers, task)
+        cookie = f"Set-Cookie: {COOKIE}={SESSION}; HttpOnly; SameSite=Lax"
+        if path in ("/vnc.html", "/vnc_lite.html"):
+            # Where noVNC was: voxl's page is next to it. The options were
+            # noVNC's, so they stay behind.
+            reply(w, "303 See Other", b"", ["Location: ./", cookie])
+            await w.drain()
             return
-        if method not in ("GET", "HEAD"):
-            reply(w, "405 Method Not Allowed", b"")
-            return
-        found = static(path)
-        if found is None:
-            reply(w, "404 Not Found", b"Not found.\n")
-            return
-        body, kind = found
-        # The page itself isn't cached: each open asks again (app=...).
-        reply(w, "200 OK", b"" if method == "HEAD" else body, kind, cache=not page)
-        await w.drain()
-    except (OSError, RuntimeError):
-        pass
+        await to_voxl(r, w, method, target, version, headers, cookie if page else None)
+    except (OSError, RuntimeError) as e:
+        log(f"couldn't pass it on to voxl: {e}")
     finally:
         w.close()
 
 
-def ws_frame(payload: bytes, opcode: int = 2) -> bytes:
-    n = len(payload)
-    if n < 126:
-        head = struct.pack(">BB", 0x80 | opcode, n)
-    elif n < 1 << 16:
-        head = struct.pack(">BBH", 0x80 | opcode, 126, n)
-    else:
-        head = struct.pack(">BBQ", 0x80 | opcode, 127, n)
-    return head + payload
-
-
-async def websocket(r: asyncio.StreamReader, w: asyncio.StreamWriter, headers: dict[str, str], task: asyncio.Task) -> None:
-    """noVNC's WebSocket, bridged to the screen's VNC once it's up."""
-    key = headers.get("sec-websocket-key", "")
-    accept = base64.b64encode(hashlib.sha1((key + WS_GUID).encode()).digest()).decode()
+async def to_voxl(r: asyncio.StreamReader, w: asyncio.StreamWriter, method: str, target: str,
+                  version: str, headers: Headers, cookie: str | None) -> None:
+    """Passes a request on to voxl, a WebSocket too, and its answer back."""
     try:
         await asyncio.shield(screen())
-        vr, vw = await asyncio.open_connection(HOST, VNC)
+        vr, vw = await asyncio.open_connection(HOST, VOXL)
     except (OSError, RuntimeError) as e:
-        log(f"couldn't reach the screen: {e}")
-        reply(w, "503 Service Unavailable", b"The screen didn't start.\n")
+        log(f"couldn't reach voxl: {e}")
+        reply(w, "503 Service Unavailable", b"The desktop didn't start.\n")
+        await w.drain()
         return
-    head = ["HTTP/1.1 101 Switching Protocols", "Upgrade: websocket", "Connection: Upgrade", f"Sec-WebSocket-Accept: {accept}"]
-    offered = [p.strip() for p in headers.get("sec-websocket-protocol", "").split(",") if p.strip()]
-    if "binary" in offered:
-        head.append("Sec-WebSocket-Protocol: binary")
-    w.write(("\r\n".join(head) + "\r\n\r\n").encode())
-    await w.drain()
+    upgrade = (header(headers, "upgrade") or "").lower() == "websocket"
+    # To voxl it's a program on its own address with its password: who it
+    # comes from was checked here.
+    out = [f"{method} {target} {version}", f"Host: {HOST}:{VOXL}", f"Authorization: Bearer {PASSWORD}"]
+    for k, v in headers:
+        if k.lower() not in ("host", "origin", "authorization", "connection", "keep-alive", "proxy-connection"):
+            out.append(f"{k}: {v}")
+    # One request per connection, so every request comes through here.
+    out.append("Connection: Upgrade" if upgrade else "Connection: close")
+    vw.write(("\r\n".join(out) + "\r\n\r\n").encode("latin-1"))
+    await vw.drain()
 
-    async def to_vnc() -> None:
+    async def up() -> None:
         try:
-            while True:
-                b0, b1 = await r.readexactly(2)
-                opcode, n = b0 & 0x0F, b1 & 0x7F
-                if n == 126:
-                    (n,) = struct.unpack(">H", await r.readexactly(2))
-                elif n == 127:
-                    (n,) = struct.unpack(">Q", await r.readexactly(8))
-                mask = await r.readexactly(4) if b1 & 0x80 else b""
-                data = await r.readexactly(n)
-                if mask:
-                    data = bytes(b ^ mask[i & 3] for i, b in enumerate(data))
-                if opcode == 0x8:  # close
-                    w.write(ws_frame(data[:2], 0x8))
-                    break
-                if opcode == 0x9:  # ping
-                    w.write(ws_frame(data, 0xA))
-                elif opcode in (0x0, 0x1, 0x2):
-                    vw.write(data)
-                    await vw.drain()
-        except (asyncio.IncompleteReadError, OSError):
+            while data := await r.read(1 << 16):
+                vw.write(data)
+                await vw.drain()
+            if vw.can_write_eof():
+                vw.write_eof()
+        except (OSError, RuntimeError):
             pass
-        finally:
-            vw.close()
 
-    async def to_browser() -> None:
+    async def down() -> None:
         try:
+            if cookie:
+                # voxl's page: the cookie goes in with its answer.
+                res = await asyncio.wait_for(vr.readuntil(b"\r\n\r\n"), 30)
+                w.write(res[:-2] + cookie.encode() + b"\r\n\r\n")
             while data := await vr.read(1 << 16):
-                w.write(ws_frame(data))
+                w.write(data)
                 await w.drain()
-        except OSError:
+        except (asyncio.IncompleteReadError, asyncio.LimitOverrunError, asyncio.TimeoutError, OSError, RuntimeError):
             pass
-        finally:
-            w.close()
 
-    await asyncio.gather(to_vnc(), to_browser())
+    upward = asyncio.ensure_future(up())
+    await down()
+    upward.cancel()
+    vw.close()
 
 
 # ── 9222: the browser's CDP ──────────────────────────────────────────────────

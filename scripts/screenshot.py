@@ -1,6 +1,7 @@
-"""Saves a screenshot of the desktop through noVNC, run inside the desktop
-image by smoke.sh: a second, headless browser opens noVNC's page, waits
-for it to connect to the screen, then takes the shot over CDP.
+"""Saves a screenshot of the desktop through voxl, run inside the desktop
+image by smoke.sh: a second, headless browser opens the page Pyo opens
+(vnc.html, which goes on to voxl's), waits for the stream, then takes the
+shot over CDP.
 
 usage: python3 - OUT.png < screenshot.py
 """
@@ -18,7 +19,7 @@ import urllib.parse
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "/tmp/desktop.png"
 PORT = 9333
-URL = "http://127.0.0.1:6080/vnc.html?autoconnect=true&resize=scale"
+URL = "http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=remote&reconnect=1"
 
 
 def devtools(method, path):
@@ -93,7 +94,7 @@ try:
             time.sleep(0.2)
     target = devtools("PUT", "/json/new?" + urllib.parse.quote(URL, safe=""))
     ws = WS(target["webSocketDebuggerUrl"])
-    # noVNC connects, then the first frames arrive.
+    # voxl's page connects, then the first frames arrive.
     time.sleep(8)
     shot = ws.call("Page.captureScreenshot", format="png")
     with open(OUT, "wb") as f:

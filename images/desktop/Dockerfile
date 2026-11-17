@@ -2,14 +2,20 @@
 #
 # One image, two uses:
 # - Agents drive the browser over CDP at 127.0.0.1:9222 in the sandbox.
-# - People see the screen through noVNC at 127.0.0.1:6080.
+# - People see and use the screen through voxl at 127.0.0.1:6080.
 #
 # Nothing runs until it's used. pyo-envd runs /etc/pyo/start at boot,
-# which starts only a small listener on 6080 and 9222 (desktop.py). It
-# serves noVNC's files and WebSocket on 6080 itself. The first use of
-# either port starts the screen (TigerVNC's Xvnc) with Openbox and a tint2
-# panel, then the browser. The browser's CDP is on 9223 behind 9222, VNC
-# on 5901, all on 127.0.0.1 only. It logs to /var/log/pyo-desktop.log.
+# which starts only a small listener on 6080 and 9222 (desktop.py). The
+# first use of either port starts the screen (Xvfb) with Openbox and a
+# tint2 panel, then voxl, then the browser. desktop.py passes 6080 on to
+# voxl (127.0.0.1:6901, with a password only desktop.py knows) and 9222 to
+# the browser's CDP on 9223, all on 127.0.0.1 only. It logs to
+# /var/log/pyo-desktop.log.
+#
+# voxl streams the screen as H.264 over a WebSocket to its page, which
+# decodes it with WebCodecs. It's built from source in its own stage below,
+# against Ubuntu's x264, libyuv and Opus. The final image has its binary
+# and those libraries, no build tools.
 #
 # The browser depends on the architecture, one per image: Google Chrome
 # on amd64 (Google has no Linux arm64 build), Playwright's Chromium on
@@ -20,30 +26,139 @@
 # runs with --no-sandbox: the sandbox itself is the isolation.
 
 ARG BASE=ghcr.io/upsetdev/pyo-sandbox-images/base:24.04
-ARG NOVNC_VERSION=1.7.0
-ARG NOVNC_SHA256=b1003a11b6e6e8d8f7f5e5586daae7f8ca651d8aee0aa155ff9ac841c48f52c6
 ARG PLAYWRIGHT_VERSION=1.65.1
+# voxl's release tag and the commit it points at, checked at build.
+ARG VOXL_VERSION=0.3.5
+ARG VOXL_COMMIT=93ad2d4839a3d1a9086a07307bfe66baa75f2504
+# What builds it: Rust through rustup (checked against its sha256 per
+# architecture) and esbuild, which bundles voxl's web page.
+ARG RUST_VERSION=1.99.1
+ARG RUSTUP_VERSION=1.28.2
+ARG RUSTUP_SHA256_AMD64=20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c
+ARG RUSTUP_SHA256_ARM64=e3853c5a252fca15252d07cb23a1bdd9377a8c6f3efa01531109281ae47f841c
+ARG ESBUILD_VERSION=0.25.12
 
+# ── voxl, built from source ─────────────────────────────────────────────────
+# On base, so its libraries are the same Ubuntu versions as the final
+# image's. Without PulseAudio (no desktop audio): the image has no sound.
+FROM ${BASE} AS voxl
+ARG VOXL_VERSION VOXL_COMMIT RUST_VERSION RUSTUP_VERSION \
+    RUSTUP_SHA256_AMD64 RUSTUP_SHA256_ARM64 ESBUILD_VERSION
+ARG TARGETARCH
+# Fewer parallel jobs on a machine short of memory. Empty: one per CPU.
+ARG CARGO_BUILD_JOBS=""
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive \
+    RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo \
+    PATH=/opt/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      clang libclang-dev libopus-dev libx264-dev libyuv-dev; \
+    rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    case "$TARGETARCH" in \
+      amd64) triple=x86_64-unknown-linux-gnu; sum=$RUSTUP_SHA256_AMD64 ;; \
+      arm64) triple=aarch64-unknown-linux-gnu; sum=$RUSTUP_SHA256_ARM64 ;; \
+      *) echo "No Rust for $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSLo /tmp/rustup-init "https://static.rust-lang.org/rustup/archive/$RUSTUP_VERSION/$triple/rustup-init"; \
+    echo "$sum  /tmp/rustup-init" | sha256sum -c -; \
+    chmod +x /tmp/rustup-init; \
+    /tmp/rustup-init -y --no-modify-path --profile minimal --default-toolchain "$RUST_VERSION"; \
+    rm /tmp/rustup-init; \
+    npm install -g "esbuild@$ESBUILD_VERSION"; \
+    rustc --version; cargo --version; esbuild --version
+
+# The release tag, checked against the commit it should point at.
+RUN set -eux; \
+    git init -q /src/voxl; \
+    cd /src/voxl; \
+    git fetch -q --depth 1 https://github.com/tembo/voxl "refs/tags/v$VOXL_VERSION:refs/tags/v$VOXL_VERSION"; \
+    [ "$(git rev-parse "v$VOXL_VERSION^{commit}")" = "$VOXL_COMMIT" ]; \
+    git -c advice.detachedHead=false checkout -q "$VOXL_COMMIT"
+
+WORKDIR /src/voxl
+COPY voxl-licenses.py /usr/local/bin/voxl-licenses.py
+RUN set -eux; \
+    cargo build --release --locked --no-default-features ${CARGO_BUILD_JOBS:+--jobs "$CARGO_BUILD_JOBS"}; \
+    install -D -m 0755 target/release/voxl /out/bin/voxl; \
+    strip /out/bin/voxl; \
+    /out/bin/voxl --version; \
+    # Its docs: license, copyright, where the source is, and the crates
+    # built into it with their licenses.
+    doc=/out/doc; \
+    install -d "$doc"; \
+    cp LICENSE "$doc/LICENSE"; \
+    cp web/inter-LICENSE.txt "$doc/inter-LICENSE.txt"; \
+    python3 -I /usr/local/bin/voxl-licenses.py "$doc/crates" --no-default-features; \
+    deb() { dpkg-query -W -f '${source:Package} ${source:Version}' "$1"; }; \
+    { \
+      echo "voxl $VOXL_VERSION"; \
+      echo; \
+      echo "Source: https://github.com/tembo/voxl"; \
+      echo "Tag: v$VOXL_VERSION"; \
+      echo "Commit: $VOXL_COMMIT"; \
+      echo "Tarball: https://github.com/tembo/voxl/archive/$VOXL_COMMIT.tar.gz"; \
+      echo; \
+      echo "Every release of https://github.com/upsetdev/pyo-sandbox-images has this"; \
+      echo "source as voxl-$VOXL_VERSION-${VOXL_COMMIT:0:12}.tar.gz (git archive of the commit)."; \
+      echo; \
+      echo "Built with Rust $RUST_VERSION and esbuild $ESBUILD_VERSION:"; \
+      echo "  cargo build --release --locked --no-default-features"; \
+      echo "The build is images/desktop/Dockerfile in that repository."; \
+      echo; \
+      echo "Linked with these libraries from Ubuntu's archive, by source package and"; \
+      echo "version. apt-get source gets their source:"; \
+      echo "  $(deb libx264-dev)"; \
+      echo "  $(deb libyuv-dev)"; \
+      echo "  $(deb libopus-dev)"; \
+    } > "$doc/SOURCE"; \
+    { \
+      echo "voxl $VOXL_VERSION, https://github.com/tembo/voxl"; \
+      echo; \
+      echo "voxl's own code: MIT License, Copyright (c) 2026 Tembo. See LICENSE."; \
+      echo; \
+      echo "This binary links x264, which is GPL-2.0-or-later, so the binary is"; \
+      echo "distributed under the GNU General Public License, version 2 or later."; \
+      echo "Its text is in /usr/share/common-licenses/GPL-2. SOURCE says where the"; \
+      echo "source is."; \
+      echo; \
+      echo "It also links libyuv (BSD-3-Clause) and Opus (BSD-3-Clause). Their"; \
+      echo "copyright files: /usr/share/doc/libx264-164/copyright,"; \
+      echo "/usr/share/doc/libyuv0/copyright and /usr/share/doc/libopus0/copyright."; \
+      echo; \
+      echo "Its web page embeds the Inter font, SIL Open Font License 1.1. See"; \
+      echo "inter-LICENSE.txt."; \
+      echo; \
+      echo "The Rust crates built into it: crates/README.md, with each crate's"; \
+      echo "license files."; \
+    } > "$doc/copyright"
+
+# ── The image ───────────────────────────────────────────────────────────────
 FROM ${BASE}
-ARG NOVNC_VERSION NOVNC_SHA256 PLAYWRIGHT_VERSION
+ARG PLAYWRIGHT_VERSION
 ARG TARGETARCH
 LABEL org.opencontainers.image.source=https://github.com/upsetdev/pyo-sandbox-images \
       org.opencontainers.image.title="Pyo Sandbox desktop" \
-      org.opencontainers.image.description="Pyo Sandbox base with a desktop, noVNC and a browser with CDP" \
+      org.opencontainers.image.description="Pyo Sandbox base with a desktop in voxl and a browser with CDP" \
       org.opencontainers.image.licenses=Apache-2.0 \
       dev.pyo.sandbox.contract="1"
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8
 
-# The screen, the window manager, the panel, a terminal and fonts. Droid
-# Sans Fallback covers CJK at a fraction of Noto CJK's size.
+# The screen, the window manager, the panel, a terminal and fonts, and
+# the libraries voxl links. Droid Sans Fallback covers CJK at a fraction
+# of Noto CJK's size.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
       dbus-x11 fonts-dejavu-core fonts-droid-fallback fonts-liberation \
-      fonts-noto-color-emoji openbox tigervnc-standalone-server tint2 \
-      wmctrl x11-xserver-utils xdg-utils xdotool xfce4-terminal; \
+      fonts-noto-color-emoji libopus0 libx264-164 libyuv0 openbox tint2 \
+      wmctrl x11-xserver-utils xdg-utils xdotool xfce4-terminal xvfb; \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
 
 # The browser, one per architecture. Its name, version and path go to
@@ -109,23 +224,13 @@ RUN set -eux; \
 COPY policy.json /etc/opt/chrome/policies/managed/pyo.json
 COPY policy.json /etc/chromium/policies/managed/pyo.json
 
-# noVNC's web files, checked against their sha256. Ubuntu's package would
-# bring Node.js and websockify along.
+# voxl, from its stage above, with its license, copyright and source.
+COPY --from=voxl /out/bin/voxl /usr/local/bin/voxl
+COPY --from=voxl /out/doc /usr/share/doc/voxl
+# Every library it needs is here.
 RUN set -eux; \
-    curl -fsSLo /tmp/novnc.tar.gz "https://github.com/novnc/noVNC/archive/refs/tags/v$NOVNC_VERSION.tar.gz"; \
-    echo "$NOVNC_SHA256  /tmp/novnc.tar.gz" | sha256sum -c -; \
-    mkdir -p /usr/share/novnc; \
-    tar -xzf /tmp/novnc.tar.gz -C /usr/share/novnc --strip-components=1 --no-same-owner; \
-    rm /tmp/novnc.tar.gz; \
-    # Its own tooling and tests only. Not vendor/pako/lib/utils, which the
-    # page imports.
-    cd /usr/share/novnc; \
-    rm -rf docs tests snap utils po .github; \
-    # noVNC at / as well as /vnc.html.
-    ln -sf vnc.html index.html
-
-COPY check-novnc.py /tmp/check-novnc.py
-RUN python3 /tmp/check-novnc.py /usr/share/novnc && rm /tmp/check-novnc.py
+    if ldd /usr/local/bin/voxl | grep 'not found'; then exit 1; fi; \
+    voxl --version
 
 COPY start /etc/pyo/start
 COPY desktop.py /usr/local/lib/pyo-desktop/desktop.py
