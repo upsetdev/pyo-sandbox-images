@@ -1,3 +1,177 @@
+/* GTK theme "Pyo" (/usr/share/themes/Pyo/gtk-3.0): Adwaita's dark
+ * variant with the dashboard's colors, radius and font on top, for the
+ * desktop's GTK apps (the file manager, the terminal's window, dialogs).
+ * A theme, not ~/.config/gtk-3.0/gtk.css: the browser keeps plain
+ * Adwaita (GTK_THEME in /usr/local/bin/browser), as it takes its colors
+ * from GTK's and would ask web pages for their dark colors.
+ *
+ * The tokens (dash/src/styles.css): canvas #0b0b0b, card #0f0f0f, muted
+ * #131313, popover #1a1a1a, accent #202020, border #242424, strong
+ * border #424242, text #f5f5f5, muted text #ababab, primary #2465ff,
+ * ring #3d77ff, radius 6px and 8px. */
+@import url("resource:///org/gtk/libgtk/theme/Adwaita/gtk-contained-dark.css");
+
+window.background,
+dialog.background {
+  background-color: #0f0f0f;
+  color: #f5f5f5;
+}
+
+menubar {
+  background: #0b0b0b;
+  border-bottom: 1px solid #242424;
+  padding: 0 4px;
+  box-shadow: none;
+}
+menubar > menuitem {
+  padding: 4px 8px;
+  color: #ababab;
+}
+menubar > menuitem:hover {
+  background: #202020;
+  color: #f5f5f5;
+  box-shadow: none;
+}
+
+toolbar,
+.primary-toolbar {
+  background: #0b0b0b;
+  border-bottom: 1px solid #242424;
+  padding: 6px 8px;
+  box-shadow: none;
+}
+toolbar button,
+button.flat {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  box-shadow: none;
+  color: #ababab;
+}
+toolbar button:hover,
+button.flat:hover {
+  background: #202020;
+  color: #f5f5f5;
+}
+
+button {
+  background: #1a1a1a;
+  border: 1px solid #333333;
+  border-radius: 6px;
+  box-shadow: none;
+  text-shadow: none;
+  -gtk-icon-shadow: none;
+  color: #f5f5f5;
+}
+button:hover {
+  background: #202020;
+}
+button:active,
+button:checked {
+  background: #242424;
+}
+button.suggested-action,
+button.default {
+  background: #2465ff;
+  border-color: #2465ff;
+  color: #ffffff;
+}
+
+entry {
+  background: #0c0c0c;
+  border: 1px solid #333333;
+  border-radius: 6px;
+  box-shadow: inset 0 1px 1px 0 rgba(0, 0, 0, 0.25);
+  color: #f5f5f5;
+  min-height: 28px;
+  padding: 0 8px;
+}
+entry:focus {
+  border-color: #3d77ff;
+  box-shadow: 0 0 0 1px #3d77ff;
+}
+
+.view,
+iconview,
+treeview.view {
+  background-color: #0f0f0f;
+  color: #f5f5f5;
+}
+.view:selected,
+iconview:selected,
+treeview.view:selected {
+  background-color: #2465ff;
+  color: #ffffff;
+}
+iconview:selected {
+  border-radius: 6px;
+}
+
+/* The side pane and the line between it and the files. */
+paned > separator,
+paned > separator.wide {
+  background: #242424;
+  background-image: none;
+  min-width: 1px;
+  min-height: 1px;
+  margin: 0;
+}
+treeview.view separator,
+treeview.view.separator {
+  color: #242424;
+  background: transparent;
+}
+
+scrollbar {
+  background: transparent;
+  border: none;
+}
+scrollbar slider {
+  background: #424242;
+  border: 3px solid transparent;
+  border-radius: 9999px;
+  min-width: 6px;
+  min-height: 6px;
+}
+scrollbar slider:hover {
+  background: #666666;
+}
+
+menu,
+.menu,
+.context-menu,
+popover.background {
+  background: #1a1a1a;
+  border: 1px solid #242424;
+  border-radius: 8px;
+  padding: 4px;
+}
+menu menuitem {
+  border-radius: 6px;
+  padding: 5px 10px;
+  color: #f5f5f5;
+}
+menu menuitem:hover {
+  background: #202020;
+}
+menu separator {
+  background: #242424;
+  margin: 4px 0;
+}
+
+tooltip.background {
+  background: #1a1a1a;
+  border: 1px solid #242424;
+  border-radius: 6px;
+}
+tooltip label {
+  color: #f5f5f5;
+}
+
+statusbar {
+  color: #ababab;
+}
+
 /* Room around the terminal's text. */
 vte-terminal {
   padding: 10px 14px;

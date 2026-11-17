@@ -159,8 +159,8 @@ async def screen() -> None:
                 # The sandbox has no sound, so no audio or microphone.
                 "--audio-enabled=false", "--microphone-enabled=false",
                 # Windows get rounded corners, maximized ones and menus
-                # excepted, and so does the dock (tint2rc).
-                "--round-corners", "10", "--round-windows", "tint2:18",
+                # excepted, and so does the dock (pyo-dock).
+                "--round-corners", "10", "--round-windows", "pyo-dock:18",
             ], {"VOXL_PASSWORD": PASSWORD, "RUST_LOG": "warn"}, logs=True)
             await wait_for(lambda: answers(VOXL), 20, "voxl")
 

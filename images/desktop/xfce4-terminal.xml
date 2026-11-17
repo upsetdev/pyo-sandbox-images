@@ -17,15 +17,15 @@
   <property name="scrolling-bar" type="string" value="TERMINAL_SCROLLBAR_NONE"/>
   <property name="scrolling-unlimited" type="bool" value="true"/>
   <property name="color-use-theme" type="bool" value="false"/>
-  <property name="color-foreground" type="string" value="#e4e5e9"/>
-  <property name="color-background" type="string" value="#121317"/>
+  <property name="color-foreground" type="string" value="#ececec"/>
+  <property name="color-background" type="string" value="#0f0f0f"/>
   <property name="color-cursor-use-default" type="bool" value="false"/>
-  <property name="color-cursor" type="string" value="#7aa2ff"/>
-  <property name="color-cursor-foreground" type="string" value="#121317"/>
+  <property name="color-cursor" type="string" value="#3d77ff"/>
+  <property name="color-cursor-foreground" type="string" value="#0f0f0f"/>
   <property name="color-selection-use-default" type="bool" value="false"/>
   <property name="color-selection" type="string" value="#ffffff"/>
   <property name="color-selection-background" type="string" value="#2c4a94"/>
   <property name="color-bold-use-default" type="bool" value="true"/>
   <property name="color-bold-is-bright" type="bool" value="false"/>
-  <property name="color-palette" type="string" value="#2a2c33;#f26d6d;#4cd28a;#f2c66d;#6b95ff;#b493ff;#4ccfe0;#c9ccd4;#5c606b;#ff8f8f;#72e6a6;#ffd88a;#94b3ff;#cbb3ff;#7adff0;#ffffff"/>
+  <property name="color-palette" type="string" value="#242424;#f26d6d;#4cd28a;#f2c66d;#6b95ff;#b493ff;#4ccfe0;#c9ccd4;#5c606b;#ff8f8f;#72e6a6;#ffd88a;#94b3ff;#cbb3ff;#7adff0;#ffffff"/>
 </channel>

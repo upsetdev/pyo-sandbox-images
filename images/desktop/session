@@ -1,7 +1,13 @@
 #!/bin/sh
 # The desktop session on the screen desktop.py starts: Pyo's wallpaper,
-# the dock (tint2) and Openbox.
+# the dock (pyo-dock, with Terminal, the browser and Files pinned) and
+# Openbox. GTK apps skip the accessibility bus, as the sandbox has none,
+# and OpenGL, which nothing on this screen needs and which costs each one
+# about 40 MB (Mesa).
+export NO_AT_BRIDGE=1 GDK_GL=disable
 xwallpaper --zoom /usr/local/share/pyo-desktop/wallpaper.png 2>/dev/null ||
-  xsetroot -solid '#17181d' 2>/dev/null || true
-tint2 >/dev/null 2>&1 &
+  xsetroot -solid '#131313' 2>/dev/null || true
+dock=/usr/local/share/pyo-desktop/dock
+pyo-dock "$dock/terminal.desktop" /usr/share/applications/browser.desktop "$dock/files.desktop" \
+  >/dev/null 2>&1 &
 exec openbox

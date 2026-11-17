@@ -52,7 +52,7 @@ On amd64 it's about 3.3 GB unpacked and 0.9 GB to pull. About 1.1 GB of that is 
 
 Everything in `base`, plus:
 
-- Xvfb, Openbox, a tint2 dock, xfce4-terminal and the PCManFM file manager
+- Xvfb, Openbox, a dock of its own (pyo-dock), xfce4-terminal and the PCManFM file manager
 - [voxl](https://github.com/tembo/voxl) 0.3.5, built from source against Ubuntu's x264, libyuv and Opus, with Pyo's changes to its web page (`images/desktop/voxl/patches`). It streams the screen as H.264 to its web page, which decodes it with WebCodecs, so the page has to be on HTTPS or localhost
 - Fonts: Inter for the desktop, JetBrains Mono for the terminal, DejaVu, Liberation, Noto Color Emoji and Droid Sans Fallback for CJK
 - wmctrl and xdotool
@@ -69,10 +69,10 @@ Chrome's version isn't pinned, as Google's repository only keeps the latest. The
 
 The desktop looks like Pyo:
 
-- A dock centered at the bottom with the terminal, the browser and the file manager, the open windows and a clock. voxl rounds its corners and the windows', so there's no compositor.
+- A dock centered at the bottom, `pyo-dock` (`images/desktop/dock/pyo-dock.c`, a small GTK program built with the image). Terminal, the browser and Files are pinned. Each app's icon is also its windows': a dot under it says it runs, and a click starts it or brings it to the front. Other apps get an icon while they run, and a clock ends the dock. voxl rounds its corners and the windows', so there's no compositor.
 - Pyo's wallpaper and icons, drawn as SVG in `images/desktop/art` and `images/desktop/icons`. The build renders the wallpaper and the page's ICO.
-- An Openbox theme of its own (`images/desktop/openbox`), GTK's Adwaita in its dark variant with Inter, and a terminal in JetBrains Mono with Pyo's colors. The browser keeps its light theme, so web pages look as they do anywhere.
-- voxl's page has Pyo's icon and loading screen, and its title names the sandbox: `Desktop | <name>`, from `?name=`.
+- The dashboard's colors, radius and font (Inter) everywhere: an Openbox theme of its own (`images/desktop/openbox`), GTK's dark Adwaita with a stylesheet on top (`images/desktop/gtk`), the file manager with places, icons and a plain toolbar (`images/desktop/files`), and a terminal in JetBrains Mono. The browser keeps its light theme, so web pages look as they do anywhere.
+- voxl's page has Pyo's icon, and its title names the sandbox: `Desktop | <name>`, from `?name=`.
 
 Managed policies (`images/desktop/policy.json`, in `/etc/opt/chrome/policies/managed` and `/etc/chromium/policies/managed`) turn off sign-in, sync and metrics, and the prompts that get in an agent's way: default browser, saving passwords, translating, promotions and surveys. `chrome://policy` lists them.
 

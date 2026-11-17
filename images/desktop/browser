@@ -1,6 +1,6 @@
 #!/bin/sh
 # The desktop's browser, with the flags a Pyo sandbox needs. Every launch
-# goes through here: the panel's, an agent's and desktop.py's. It's
+# goes through here: the dock's, an agent's and desktop.py's. It's
 # installed as browser, google-chrome and chromium, whichever browser the
 # image has (/etc/pyo/browser says which).
 #
@@ -8,9 +8,9 @@
 # listens on 127.0.0.1:9223, which desktop.py serves as 9222. No
 # background downloads (component updates, models): they slow its start.
 # Flags given after these win, so a caller can pick its own port or
-# profile. It keeps GTK's light theme, not the desktop's dark one
-# (/etc/gtk-3.0/settings.ini): with that, the browser would ask web pages
-# for their dark colors.
+# profile. It keeps GTK's plain light Adwaita, not the desktop's dark Pyo
+# theme (/etc/gtk-3.0/settings.ini): with that, the browser would ask web
+# pages for their dark colors.
 . /etc/pyo/browser
 export GTK_THEME=Adwaita
 set -- \

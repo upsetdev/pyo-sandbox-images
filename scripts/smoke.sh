@@ -96,7 +96,7 @@ tools() {
       v Xvfb       dpkg-query -W xvfb
       v voxl       voxl --version
       v openbox    openbox --version
-      v tint2      sh -c "tint2 -v 2>&1 | grep -m1 -i \"tint2 version\""
+      v pyo-dock   sh -c "test -x /usr/local/bin/pyo-dock && ! ldd /usr/local/bin/pyo-dock | grep -q \"not found\" && echo /usr/local/bin/pyo-dock"
       v wmctrl     wmctrl --version
       v xdotool    xdotool --version
       v xfce4-terminal dpkg-query -W xfce4-terminal
@@ -231,7 +231,7 @@ ok("a Host that isn't localhost is turned away") if " 403 " in status else bad(f
 s, _, _ = request("/screenshot", port=6901)
 ok(f"voxl itself needs its password ({s})") if s == 401 else bad(f"voxl answered without its password: {s}")
 
-# The desktop on the screen, as voxl sees it: not black, and the panel's
+# The desktop on the screen, as voxl sees it: not black, and the dock's
 # color at the bottom.
 def png_pixels(data):
     import struct, zlib
@@ -305,7 +305,7 @@ while time.monotonic() - t < 20:
         break
     time.sleep(0.5)
 ok("?app=chromium: the browser has a window") if "chrom" in out.lower() else bad(f"?app=chromium: no browser window: {out!r}")
-ok("the dock (tint2) is up") if "tint2" in out.lower() else bad(f"no dock: {out!r}")
+ok("the dock (pyo-dock) is up") if "pyo-dock" in out.lower() else bad(f"no dock: {out!r}")
 s = subprocess.run(["xdotool", "search", "--onlyvisible", "--class", "chrom", "getwindowgeometry"],
                    env=env, capture_output=True, text=True).stdout
 ok("the browser is maximized") if "1280x" in s else bad(f"the browser isn't maximized: {s!r}")
