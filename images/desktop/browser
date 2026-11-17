@@ -8,8 +8,11 @@
 # listens on 127.0.0.1:9223, which desktop.py serves as 9222. No
 # background downloads (component updates, models): they slow its start.
 # Flags given after these win, so a caller can pick its own port or
-# profile.
+# profile. It keeps GTK's light theme, not the desktop's dark one
+# (/etc/gtk-3.0/settings.ini): with that, the browser would ask web pages
+# for their dark colors.
 . /etc/pyo/browser
+export GTK_THEME=Adwaita
 set -- \
   --test-type --no-first-run --no-default-browser-check \
   --disable-dev-shm-usage --password-store=basic \

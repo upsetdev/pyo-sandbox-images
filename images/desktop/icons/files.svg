@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- The dock's Files icon. -->
+  <defs>
+    <linearGradient id="f" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4f86ff"/>
+      <stop offset="1" stop-color="#1f50d8"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="folder" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dfe8ff"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#f)"/>
+  <rect x="8.75" y="8.75" width="110.5" height="110.5" rx="25.25" fill="none" stroke="url(#edge)" stroke-width="1.5"/>
+  <path d="M32 44 C32 40.7 34.7 38 38 38 H54 C55.9 38 57.6 38.9 58.8 40.4 L62 44.5 H90 C93.3 44.5 96 47.2 96 50.5 V84 C96 87.3 93.3 90 90 90 H38 C34.7 90 32 87.3 32 84 Z" fill="url(#folder)"/>
+  <path d="M32 54 H96" stroke="#1f50d8" stroke-opacity="0.18" stroke-width="2"/>
+</svg>

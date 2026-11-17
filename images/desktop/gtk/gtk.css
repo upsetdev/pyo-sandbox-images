@@ -1,0 +1,4 @@
+/* Room around the terminal's text. */
+vte-terminal {
+  padding: 10px 14px;
+}

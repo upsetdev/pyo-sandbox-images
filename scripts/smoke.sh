@@ -7,8 +7,8 @@
 # Commands run as pyo-envd runs them: as root in /root, with only HOME,
 # LANG, TERM and PATH set, not the image's own Env.
 # `desktop` starts /etc/pyo/start in a container, then checks voxl's page
-# (and where noVNC's was), its WebSocket, its screenshot, CDP and the
-# browser on 127.0.0.1 inside it, and the third-party notices. With a path
+# (and where noVNC's was), its WebSocket, its screenshot, CDP, the browser
+# and the dock on 127.0.0.1 inside it, and the third-party notices. With a path
 # it also saves a screenshot of voxl's page as a viewer sees it, taken by
 # a second, headless browser in the image.
 set -euo pipefail
@@ -99,7 +99,11 @@ tools() {
       v wmctrl     wmctrl --version
       v xdotool    xdotool --version
       v xfce4-terminal dpkg-query -W xfce4-terminal
+      v pcmanfm    dpkg-query -W pcmanfm
+      v xwallpaper dpkg-query -W xwallpaper
       v fonts      sh -c "fc-list | grep -c -iE \"dejavu|liberation|emoji|droid\""
+      v inter      sh -c "fc-list | grep -m1 -i \"Inter Variable\""
+      v jetbrains  sh -c "fc-list | grep -m1 -i \"JetBrains Mono\""
       cat /etc/pyo/browser | sed "s/^/        /"
     fi
     exit $fails
@@ -279,6 +283,10 @@ while time.monotonic() - t < 20:
         break
     time.sleep(0.5)
 ok("?app=chromium: the browser has a window") if "chrom" in out.lower() else bad(f"?app=chromium: no browser window: {out!r}")
+ok("the dock (tint2) is up") if "tint2" in out.lower() else bad(f"no dock: {out!r}")
+s = subprocess.run(["xdotool", "search", "--onlyvisible", "--class", "chrom", "getwindowgeometry"],
+                   env=env, capture_output=True, text=True).stdout
+ok("the browser is maximized") if "1280x" in s else bad(f"the browser isn't maximized: {s!r}")
 
 # Third-party notices.
 for f in ("/usr/share/doc/pyo-sandbox-images/THIRD_PARTY_NOTICES.md", "/usr/share/doc/voxl/LICENSE",

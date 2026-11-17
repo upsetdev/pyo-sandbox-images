@@ -1,0 +1,12 @@
+[Icon Theme]
+Name=Pyo
+Comment=The desktop's app icons, with Adwaita for everything else
+Inherits=Adwaita,hicolor
+Directories=scalable/apps
+
+[scalable/apps]
+Size=128
+MinSize=16
+MaxSize=512
+Type=Scalable
+Context=Applications

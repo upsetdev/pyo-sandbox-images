@@ -7,7 +7,7 @@
 # Nothing runs until it's used. pyo-envd runs /etc/pyo/start at boot,
 # which starts only a small listener on 6080 and 9222 (desktop.py). The
 # first use of either port starts the screen (Xvfb) with Openbox and a
-# tint2 panel, then voxl, then the browser. desktop.py passes 6080 on to
+# tint2 dock, then voxl, then the browser. desktop.py passes 6080 on to
 # voxl (127.0.0.1:6901, with a password only desktop.py knows) and 9222 to
 # the browser's CDP on 9223, all on 127.0.0.1 only. It logs to
 # /var/log/pyo-desktop.log.
@@ -16,6 +16,10 @@
 # decodes it with WebCodecs. It's built from source in its own stage below,
 # against Ubuntu's x264, libyuv and Opus. The final image has its binary
 # and those libraries, no build tools.
+#
+# The look: Pyo's wallpaper and icons (art, icons), an Openbox theme
+# (openbox), a dock (tint2rc), GTK's dark Adwaita with Inter (gtk) and
+# the terminal's colors and font (xfce4-terminal.xml).
 #
 # The browser depends on the architecture, one per image: Google Chrome
 # on amd64 (Google has no Linux arm64 build), Playwright's Chromium on
@@ -143,6 +147,18 @@ RUN set -eux; \
       echo "license files."; \
     } > "$doc/copyright"
 
+# ── The desktop's art ───────────────────────────────────────────────────────
+# The wallpaper, rendered from its SVG in art.
+FROM ${BASE} AS art
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends librsvg2-bin; \
+    rm -rf /var/lib/apt/lists/*
+COPY art /art
+RUN sh /art/build.sh /out
+
 # ── The image ───────────────────────────────────────────────────────────────
 FROM ${BASE}
 ARG PLAYWRIGHT_VERSION
@@ -157,15 +173,19 @@ LABEL org.opencontainers.image.source=https://github.com/upsetdev/pyo-sandbox-im
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8
 
-# The screen, the window manager, the panel, a terminal and fonts, and
-# the libraries voxl links. Droid Sans Fallback covers CJK at a fraction
-# of Noto CJK's size.
+# The screen, the window manager, the dock, a terminal, a file manager
+# (PCManFM), the wallpaper's setter and fonts, and the libraries voxl
+# links. Droid Sans Fallback covers CJK at a fraction of Noto CJK's size.
+# Inter (variable) is the desktop's font, JetBrains Mono the terminal's.
+# librsvg2-common lets GTK apps load SVG icons.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
-      dbus-x11 fonts-dejavu-core fonts-droid-fallback fonts-liberation \
-      fonts-noto-color-emoji libopus0 libx264-164 libyuv0 openbox tint2 \
-      wmctrl x11-xserver-utils xdg-utils xdotool xfce4-terminal xvfb; \
+      dbus-x11 fonts-dejavu-core fonts-droid-fallback fonts-inter-variable \
+      fonts-jetbrains-mono fonts-liberation fonts-noto-color-emoji \
+      libopus0 librsvg2-common libx264-164 libyuv0 openbox pcmanfm tint2 \
+      wmctrl x11-xserver-utils xdg-utils xdotool xfce4-terminal xvfb \
+      xwallpaper; \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
 
 # The browser, one per architecture. Its name, version and path go to
@@ -242,10 +262,30 @@ RUN set -eux; \
 # Third-party software in the image and its licenses.
 COPY --from=notices THIRD_PARTY_NOTICES.md /usr/share/doc/pyo-sandbox-images/THIRD_PARTY_NOTICES.md
 
+# The look. Openbox's theme, and its rc.xml set to use it (openbox/rc.py).
+COPY openbox/themerc openbox/*.xbm /usr/share/themes/Pyo/openbox-3/
+COPY openbox/rc.py /tmp/rc.py
+RUN python3 -I /tmp/rc.py /etc/xdg/openbox/rc.xml && rm /tmp/rc.py
+# Pyo's icons for the terminal and the file manager, Adwaita's for the rest.
+COPY icons/index.theme /usr/share/icons/Pyo/index.theme
+COPY icons/terminal.svg /usr/share/icons/Pyo/scalable/apps/org.xfce.terminal.svg
+COPY icons/files.svg /usr/share/icons/Pyo/scalable/apps/system-file-manager.svg
+RUN set -eux; \
+    cd /usr/share/icons/Pyo/scalable/apps; \
+    ln -s org.xfce.terminal.svg utilities-terminal.svg; \
+    gtk-update-icon-cache -q /usr/share/icons/Pyo
+# GTK, the terminal and the dock.
+COPY gtk/settings.ini /etc/gtk-3.0/settings.ini
+COPY gtk/gtk.css /root/.config/gtk-3.0/gtk.css
+COPY xfce4-terminal.xml /etc/xdg/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml
+COPY tint2rc /etc/xdg/tint2/tint2rc
+COPY dock /usr/local/share/pyo-desktop/dock
+# The wallpaper.
+COPY --from=art /out /usr/local/share/pyo-desktop
+
 COPY start /etc/pyo/start
 COPY desktop.py /usr/local/lib/pyo-desktop/desktop.py
 COPY session /usr/local/lib/pyo-desktop/session
-COPY tint2rc /etc/xdg/tint2/tint2rc
 
 RUN chmod 755 /etc/pyo/start /usr/local/lib/pyo-desktop/session \
     && python3 -m py_compile /usr/local/lib/pyo-desktop/desktop.py

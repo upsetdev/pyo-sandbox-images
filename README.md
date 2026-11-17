@@ -52,9 +52,9 @@ On amd64 it's about 3.3 GB unpacked and 0.9 GB to pull. About 1.1 GB of that is 
 
 Everything in `base`, plus:
 
-- Xvfb, Openbox, a tint2 panel and xfce4-terminal
+- Xvfb, Openbox, a tint2 dock, xfce4-terminal and the PCManFM file manager
 - [voxl](https://github.com/tembo/voxl) 0.3.5, built from source against Ubuntu's x264, libyuv and Opus. It streams the screen as H.264 to its web page, which decodes it with WebCodecs, so the page has to be on HTTPS or localhost
-- Fonts: DejaVu, Liberation, Noto Color Emoji and Droid Sans Fallback for CJK
+- Fonts: Inter for the desktop, JetBrains Mono for the terminal, DejaVu, Liberation, Noto Color Emoji and Droid Sans Fallback for CJK
 - wmctrl and xdotool
 - One browser, which depends on the architecture
 
@@ -66,6 +66,12 @@ Everything in `base`, plus:
 Either one runs as `browser`, also named `google-chrome` and `chromium`. That wrapper adds the flags a sandbox needs: `--no-sandbox` for root, no first run, no default browser check, no background networking or component updates, and CDP on 127.0.0.1:9223. Flags you pass after them win. `/etc/pyo/browser` says which browser it is, its version and its path.
 
 Chrome's version isn't pinned, as Google's repository only keeps the latest. The weekly build picks it up.
+
+The desktop looks like Pyo:
+
+- A dock centered at the bottom with the terminal, the browser and the file manager, the open windows and a clock. voxl rounds its corners and the windows', so there's no compositor.
+- Pyo's wallpaper and icons, drawn as SVG in `images/desktop/art` and `images/desktop/icons`. The build renders the wallpaper.
+- An Openbox theme of its own (`images/desktop/openbox`), GTK's Adwaita in its dark variant with Inter, and a terminal in JetBrains Mono with Pyo's colors. The browser keeps its light theme, so web pages look as they do anywhere.
 
 Managed policies (`images/desktop/policy.json`, in `/etc/opt/chrome/policies/managed` and `/etc/chromium/policies/managed`) turn off sign-in, sync and metrics, and the prompts that get in an agent's way: default browser, saving passwords, translating, promotions and surveys. `chrome://policy` lists them.
 
@@ -108,7 +114,7 @@ scripts/smoke.sh desktop pyo-sandbox/desktop:local out/desktop.png
 
 `--build-context notices=.` gives the build THIRD_PARTY_NOTICES.md, which both images carry. Use `--platform linux/arm64` for arm64. It needs an arm64 machine or QEMU. `desktop` builds voxl with Rust: `--build-arg CARGO_BUILD_JOBS=4` uses less memory.
 
-`smoke.sh` runs commands the way pyo-envd does and prints every tool's version. For `desktop` it starts `/etc/pyo/start`, then checks `vnc.html` and voxl's page, its WebSocket (101, then voxl's hello) and who it lets in, voxl's screenshot (not black) and `/wait`, CDP's `/json/version`, `?app=chromium` and the notices. With a path it saves a screenshot of voxl's page as a viewer sees it.
+`smoke.sh` runs commands the way pyo-envd does and prints every tool's version. For `desktop` it starts `/etc/pyo/start`, then checks `vnc.html` and voxl's page, its WebSocket (101, then voxl's hello) and who it lets in, voxl's screenshot (not black) and `/wait`, CDP's `/json/version`, `?app=chromium` with the browser maximized, the dock and the notices. With a path it saves a screenshot of voxl's page as a viewer sees it.
 
 ## Versions
 
