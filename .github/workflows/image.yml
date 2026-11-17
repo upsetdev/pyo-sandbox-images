@@ -62,6 +62,18 @@ jobs:
           tags: pyo-sandbox/${{ inputs.image }}:test
       - name: Smoke test
         run: scripts/smoke.sh "${{ inputs.image }}" "pyo-sandbox/${{ inputs.image }}:test"
+      # Where the source of desktop's GPL software is (voxl, x264), for the
+      # release's notes.
+      - name: Sources
+        if: inputs.image == 'desktop'
+        run: docker run --rm pyo-sandbox/desktop:test cat /usr/share/doc/voxl/SOURCE > "SOURCE-${{ matrix.arch }}.txt"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: inputs.image == 'desktop'
+        with:
+          name: sources-desktop-${{ matrix.arch }}
+          path: SOURCE-${{ matrix.arch }}.txt
+          if-no-files-found: error
+          retention-days: 1
       # The same build again, from the builder's cache, pushed by digest.
       - name: Push
         id: push
