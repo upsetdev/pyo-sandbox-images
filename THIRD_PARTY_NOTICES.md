@@ -34,7 +34,7 @@ Everything in base, plus:
 | Component | Version | License | Source |
 | --- | --- | --- | --- |
 | voxl | 0.3.5, commit `93ad2d4839a3d1a9086a07307bfe66baa75f2504` | voxl's code is MIT. Its binary links x264, so the binary is distributed under the GPL, version 2 or later | https://github.com/tembo/voxl, and `voxl-0.3.5-93ad2d4839a3.tar.gz` in every release of this repository |
-| The Rust crates built into voxl | as voxl's `Cargo.lock` pins them | Mostly MIT or Apache-2.0. Each one is listed with its license in `/usr/share/doc/voxl/crates/README.md`, with its license files | https://crates.io |
+| The Rust crates built into voxl | as voxl's `Cargo.lock` pins them | Mostly MIT or Apache-2.0. Each one is listed with its license in `/usr/share/doc/voxl/crates/README.md`, with its license files | https://crates.io, and `voxl-0.3.5-93ad2d4839a3-vendor.tar.gz` (cargo vendor) in every release of this repository |
 | Inter, the font voxl's page embeds | the one in voxl 0.3.5 | SIL Open Font License 1.1 | https://github.com/rsms/inter |
 | x264 (`libx264-164`, Ubuntu's archive) | 2:0.164.3108+git31e19f9-1 | GPL-2.0-or-later | Ubuntu's source package `x264`: https://launchpad.net/ubuntu/+source/x264 |
 | libyuv (`libyuv0`, Ubuntu's archive) | 0.0~git202401110.af6ac82-1 | BSD-3-Clause | Ubuntu's source package `libyuv`: https://launchpad.net/ubuntu/+source/libyuv |

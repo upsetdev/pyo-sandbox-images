@@ -108,7 +108,9 @@ RUN set -eux; \
       echo "Tarball: https://github.com/tembo/voxl/archive/$VOXL_COMMIT.tar.gz"; \
       echo; \
       echo "Every release of https://github.com/upsetdev/pyo-sandbox-images has this"; \
-      echo "source as voxl-$VOXL_VERSION-${VOXL_COMMIT:0:12}.tar.gz (git archive of the commit)."; \
+      echo "source as voxl-$VOXL_VERSION-${VOXL_COMMIT:0:12}.tar.gz (git archive of the commit),"; \
+      echo "and the Rust crates built into it as voxl-$VOXL_VERSION-${VOXL_COMMIT:0:12}-vendor.tar.gz"; \
+      echo "(cargo vendor). Unpacked in one folder, the two build offline."; \
       echo; \
       echo "Built with Rust $RUST_VERSION and esbuild $ESBUILD_VERSION:"; \
       echo "  cargo build --release --locked --no-default-features"; \

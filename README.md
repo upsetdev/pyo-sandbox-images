@@ -119,4 +119,4 @@ scripts/smoke.sh desktop pyo-sandbox/desktop:local out/desktop.png
 
 ## Licenses
 
-This repo's own files are Apache 2.0, like Pyo. The images bundle software under other licenses, including the GPL (voxl's binary, as it links x264, which is GPL). [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists each one with its version, license and source. Both images carry it in `/usr/share/doc/pyo-sandbox-images`, and the label `dev.pyo.sandbox.notices` points to it. voxl's license, copyright and source are in `/usr/share/doc/voxl`, and every release here has voxl's source as a tarball.
+This repo's own files are Apache 2.0, like Pyo. The images bundle software under other licenses, including the GPL (voxl's binary, as it links x264, which is GPL). [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists each one with its version, license and source. Both images carry it in `/usr/share/doc/pyo-sandbox-images`, and the label `dev.pyo.sandbox.notices` points to it. voxl's license, copyright and source are in `/usr/share/doc/voxl`, and every release here has voxl's source and the Rust crates built into it as tarballs, which build offline together.
