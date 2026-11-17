@@ -164,10 +164,10 @@ else:
 s, h, body = request("/")
 ok(f"voxl's page {s}, {len(body)} bytes") if s == 200 and b"client.js" in body else bad(f"voxl's page: {s} {body[:200]!r}")
 ok("its cookie with it") if h.get("set-cookie", "").startswith("pyo_desktop=") else bad(f"no cookie with the page: {h}")
-# Pyo's changes to the page (images/desktop/voxl/patches): its icons, its
-# loading screen and voxl's notice.
-if b'href="favicon.svg"' in body and b'id="status-text"' in body and b"Copyright (c) 2026 Tembo" in body:
-    ok("the page has Pyo's icons, loading screen and voxl's notice")
+# Pyo's changes to the page (images/desktop/voxl/patches): its icons and
+# voxl's notice.
+if b'href="favicon.svg"' in body and b"Copyright (c) 2026 Tembo" in body:
+    ok("the page has Pyo's icons and voxl's notice")
 else:
     bad("the page lacks Pyo's changes")
 for f in ("client.js", "worker.js"):

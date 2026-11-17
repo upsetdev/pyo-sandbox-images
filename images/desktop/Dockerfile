@@ -119,8 +119,8 @@ RUN set -eux; \
       echo "Commit: $VOXL_COMMIT"; \
       echo "Tarball: https://github.com/tembo/voxl/archive/$VOXL_COMMIT.tar.gz"; \
       echo; \
-      echo "Changed for Pyo: its web page only (the icons, the loading screen and"; \
-      echo "the tab's title). The changes are the patches in patches/ here, applied"; \
+      echo "Changed for Pyo: its web page only (the icons, the tab's title and two"; \
+      echo "messages). The changes are the patches in patches/ here, applied"; \
       echo "in order with git apply to that commit. They're also in"; \
       echo "images/desktop/voxl/patches in https://github.com/upsetdev/pyo-sandbox-images."; \
       echo; \
