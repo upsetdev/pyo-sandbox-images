@@ -99,7 +99,9 @@ RUN set -eux; \
     git status --short
 COPY voxl-licenses.py /usr/local/bin/voxl-licenses.py
 RUN set -eux; \
-    cargo build --release --locked --no-default-features ${CARGO_BUILD_JOBS:+--jobs "$CARGO_BUILD_JOBS"}; \
+    # cargo reads CARGO_BUILD_JOBS itself, and an empty one is an error.
+    [ -n "$CARGO_BUILD_JOBS" ] || unset CARGO_BUILD_JOBS; \
+    cargo build --release --locked --no-default-features; \
     install -D -m 0755 target/release/voxl /out/bin/voxl; \
     strip /out/bin/voxl; \
     /out/bin/voxl --version; \
