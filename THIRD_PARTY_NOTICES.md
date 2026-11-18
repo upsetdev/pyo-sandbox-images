@@ -17,7 +17,7 @@ Both images carry a copy of this file in `/usr/share/doc/pyo-sandbox-images/THIR
 | pnpm | 12.21.0 | MIT | https://github.com/pnpm/pnpm |
 | Bun | 1.4.4 | MIT. It includes JavaScriptCore and parts of WebKit, which are LGPL-2.0, and other libraries listed at https://bun.sh/docs/project/licensing | https://github.com/oven-sh/bun |
 | Deno | 2.9.8 | MIT, with V8 (BSD-3-Clause) and other libraries | https://github.com/denoland/deno |
-| GitHub CLI `gh` (GitHub's apt repository) | 2.104.0 | MIT | https://github.com/cli/cli |
+| GitHub CLI `gh` (GitHub's apt repository) | 2.105.0 | MIT | https://github.com/cli/cli |
 | Docker CLI `docker-ce-cli` (Docker's apt repository) | 29.10.0 | Apache-2.0 | https://github.com/docker/cli |
 | Docker Buildx `docker-buildx-plugin` (Docker's apt repository) | 0.39.0 | Apache-2.0 | https://github.com/docker/buildx |
 | Docker Compose `docker-compose-plugin` (Docker's apt repository) | 5.7.1 | Apache-2.0 | https://github.com/docker/compose |

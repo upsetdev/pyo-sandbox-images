@@ -34,7 +34,7 @@ cosign verify ghcr.io/upsetdev/pyo-sandbox-images/base:24.04 \
 | pnpm | 12.21.0 | corepack 0.36.0 |
 | Bun | 1.4.4 | GitHub release |
 | Deno | 2.9.8 | GitHub release |
-| GitHub CLI `gh` | 2.104.0 | GitHub's apt repository |
+| GitHub CLI `gh` | 2.105.0 | GitHub's apt repository |
 | Docker CLI, buildx, compose | 29.10.0, 0.39.0, 5.7.1 | Docker's apt repository |
 | Claude Code `claude` | 2.1.325 | npm |
 | Codex `codex` | 0.169.0 | npm |
