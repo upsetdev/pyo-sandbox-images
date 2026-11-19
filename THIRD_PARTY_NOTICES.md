@@ -2,7 +2,7 @@
 
 The files in this repository are Apache 2.0 (see the README). The images built from them bundle software made by others, under its own licenses. This file lists every component the images ship that isn't a plain Ubuntu package, with its version, license and source.
 
-Ubuntu 24.04 and every package installed from Ubuntu's archive keep their licenses in `/usr/share/doc/<package>/copyright` inside the image. Packages from other apt repositories (GitHub CLI, Docker, Google Chrome) are listed below.
+Ubuntu 24.04 and every package installed from Ubuntu's archive keep their licenses in `/usr/share/doc/<package>/copyright` inside the image. Packages from other apt repositories (Docker, Google Chrome) and the GitHub CLI release are listed below.
 
 Both images carry a copy of this file in `/usr/share/doc/pyo-sandbox-images/THIRD_PARTY_NOTICES.md`, and the label `dev.pyo.sandbox.notices` points to it. Versions are those this repository pins. The weekly build takes Ubuntu's security updates and the latest Chrome, so `/usr/share/doc/voxl/SOURCE` and each release's notes give the exact x264, libyuv and Opus versions of that build.
 
@@ -17,7 +17,7 @@ Both images carry a copy of this file in `/usr/share/doc/pyo-sandbox-images/THIR
 | pnpm | 12.21.0 | MIT | https://github.com/pnpm/pnpm |
 | Bun | 1.4.4 | MIT. It includes JavaScriptCore and parts of WebKit, which are LGPL-2.0, and other libraries listed at https://bun.sh/docs/project/licensing | https://github.com/oven-sh/bun |
 | Deno | 2.9.8 | MIT, with V8 (BSD-3-Clause) and other libraries | https://github.com/denoland/deno |
-| GitHub CLI `gh` (GitHub's apt repository) | 2.105.0 | MIT | https://github.com/cli/cli |
+| GitHub CLI `gh` (GitHub release) | 2.105.0 | MIT | https://github.com/cli/cli |
 | Docker CLI `docker-ce-cli` (Docker's apt repository) | 29.10.0 | Apache-2.0 | https://github.com/docker/cli |
 | Docker Buildx `docker-buildx-plugin` (Docker's apt repository) | 0.39.0 | Apache-2.0 | https://github.com/docker/buildx |
 | Docker Compose `docker-compose-plugin` (Docker's apt repository) | 5.7.1 | Apache-2.0 | https://github.com/docker/compose |

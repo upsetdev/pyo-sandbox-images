@@ -64,29 +64,37 @@ RUN set -eux; \
     ln -s /usr/bin/vim.tiny /usr/local/bin/vim; \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
 
-# GitHub CLI and Docker's CLI with buildx and compose, from their own apt
-# repositories. Only the CLI: there's no Docker daemon in the image.
+# Docker's CLI with buildx and compose, from Docker's apt repository.
+# Only the CLI: there's no Docker daemon in the image.
 RUN set -eux; \
-    key() { \
-      curl -fsSL "$2" -o /tmp/key; \
-      gpg --show-keys --with-colons /tmp/key | grep -q "^fpr:::::::::$3:" || { echo "$1's key isn't $3" >&2; exit 1; }; \
-      if grep -q 'BEGIN PGP' /tmp/key; then gpg --dearmor < /tmp/key > "/etc/apt/keyrings/$1.gpg"; \
-      else cp /tmp/key "/etc/apt/keyrings/$1.gpg"; fi; \
-      rm /tmp/key; \
-    }; \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /tmp/key; \
+    gpg --show-keys --with-colons /tmp/key | grep -q '^fpr:::::::::9DC858229FC7DD38854AE2D88D81803C0EBFCD88:' \
+      || { echo "Docker's key isn't 9DC858229FC7DD38854AE2D88D81803C0EBFCD88" >&2; exit 1; }; \
     install -d -m 0755 /etc/apt/keyrings; \
-    key github-cli https://cli.github.com/packages/githubcli-archive-keyring.gpg 7F38BBB59D064DBCB3D84D725612B36462313325; \
-    key docker https://download.docker.com/linux/ubuntu/gpg 9DC858229FC7DD38854AE2D88D81803C0EBFCD88; \
-    echo "deb [arch=$TARGETARCH signed-by=/etc/apt/keyrings/github-cli.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list; \
+    gpg --dearmor < /tmp/key > /etc/apt/keyrings/docker.gpg; \
+    rm /tmp/key; \
     echo "deb [arch=$TARGETARCH signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
-      "gh=$GH_VERSION" \
       "docker-ce-cli=5:$DOCKER_VERSION-1~ubuntu.24.04~noble" \
       "docker-buildx-plugin=$BUILDX_VERSION-1~ubuntu.24.04~noble" \
       "docker-compose-plugin=$COMPOSE_VERSION-1~ubuntu.24.04~noble"; \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb; \
-    gh --version; docker --version; docker buildx version; docker compose version
+    docker --version; docker buildx version; docker compose version
+
+# GitHub CLI, the .deb from its GitHub release. GitHub's apt repository
+# drops old versions, which breaks a pinned build.
+RUN set -eux; \
+    case "$TARGETARCH" in \
+      amd64|arm64) f="gh_${GH_VERSION}_linux_$TARGETARCH.deb" ;; \
+      *) echo "No gh for $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    cd /tmp; \
+    curl -fsSLO "https://github.com/cli/cli/releases/download/v$GH_VERSION/$f"; \
+    curl -fsSL "https://github.com/cli/cli/releases/download/v$GH_VERSION/gh_${GH_VERSION}_checksums.txt" | grep " $f\$" | sha256sum -c -; \
+    dpkg -i "$f"; \
+    rm "$f"; \
+    gh --version
 
 # Node.js LTS, the official build, then pnpm through corepack. pnpm is
 # fetched now, so it works in a sandbox without network too.
